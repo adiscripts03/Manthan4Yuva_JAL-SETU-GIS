@@ -69,17 +69,7 @@ export default function TopBar({ onSearch }: TopBarProps) {
 
       {/* Right: Search + Controls + Theme Switcher */}
       <div className="flex items-center gap-3">
-        {/* Search */}
-        <div className="relative hidden sm:block w-48 lg:w-64">
-          <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
-          <input
-            type="text"
-            value={searchVal}
-            onChange={handleSearchChange}
-            placeholder="Search GIS features..."
-            className="w-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] pl-8 pr-3 py-1.5 rounded-lg outline-none focus:border-[var(--color-primary)] transition-colors placeholder:text-[var(--text-muted)]"
-          />
-        </div>
+
 
         {/* Status indicator */}
         <div className="hidden lg:flex items-center gap-1.5 bg-[var(--color-soft-green)] px-2.5 py-1 rounded-full text-[11px] font-medium text-[var(--color-natural-green)] border border-[var(--color-natural-green)]/20">

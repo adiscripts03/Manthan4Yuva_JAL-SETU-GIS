@@ -1,16 +1,33 @@
 import { useState, useEffect } from 'react';
 import Sidebar from '../components/Sidebar';
 import { getWaterways, getWaterwayStats, getNullahs, getWaterwayById } from '../services/api';
-import { MapContainer, TileLayer, Polyline, Tooltip, Marker } from 'react-leaflet';
+import { MapContainer, TileLayer, Polyline, Tooltip, Marker, Popup, useMap, Circle } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import { Play, Pause, X, Layers, Plus, Minus, Compass, Search, Filter } from 'lucide-react';
+import { X, Layers, Plus, Minus, Compass, Search, Filter, MapPin } from 'lucide-react';
 
 const aiIcon = new L.DivIcon({
   className: 'custom-ai-icon',
   html: `<div class="w-4 h-4 bg-red-500 rounded-full animate-ping absolute opacity-75"></div><div class="w-4 h-4 bg-red-600 border-2 border-white rounded-full relative shadow-md"></div>`,
   iconSize: [16, 16],
   iconAnchor: [8, 8]
+});
+
+// Pin-point marker icon for AI location queries
+const pinIcon = new L.DivIcon({
+  className: 'custom-pin-icon',
+  html: `
+    <div style="position:relative;display:flex;flex-direction:column;align-items:center;">
+      <div style="width:36px;height:36px;background:linear-gradient(135deg,#3B82F6,#1D4ED8);border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 4px 12px rgba(59,130,246,0.5);display:flex;align-items:center;justify-content:center;border:3px solid white;">
+        <div style="width:10px;height:10px;background:white;border-radius:50%;transform:rotate(45deg);"></div>
+      </div>
+      <div style="width:3px;height:6px;background:linear-gradient(to bottom,#1D4ED8,transparent);margin-top:-2px;"></div>
+      <div style="width:24px;height:24px;background:rgba(59,130,246,0.25);border-radius:50%;position:absolute;top:32px;animation:ping 1.5s cubic-bezier(0,0,0.2,1) infinite;"></div>
+    </div>
+  `,
+  iconSize: [36, 48],
+  iconAnchor: [18, 48],
+  popupAnchor: [0, -48],
 });
 
 const WATERWAY_COLORS: Record<string, string> = {
@@ -29,14 +46,59 @@ const WATERWAY_WEIGHTS: Record<string, number> = {
   unknown: 2
 };
 
+/**
+ * MapController — handles imperative map commands (flyTo, markers) inside MapContainer context.
+ * Listens for 'ai_map_location' events and flies to the specified coordinates.
+ */
+function MapController({ 
+  onLocationReceived 
+}: { 
+  onLocationReceived: (loc: any) => void 
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    const handleAiLocation = (e: any) => {
+      const loc = e.detail;
+      if (loc && loc.lat && loc.lng) {
+        console.log(`[MapController] Flying to ${loc.location_name} at [${loc.lat}, ${loc.lng}] zoom=${loc.zoom}`);
+        
+        // Fly to location with smooth animation
+        map.flyTo([loc.lat, loc.lng], loc.zoom || 16, {
+          duration: 2,
+          easeLinearity: 0.25,
+        });
+
+        // Pass location data up for marker rendering
+        onLocationReceived(loc);
+      }
+    };
+
+    window.addEventListener('ai_map_location', handleAiLocation);
+    return () => window.removeEventListener('ai_map_location', handleAiLocation);
+  }, [map, onLocationReceived]);
+
+  return null;
+}
+
+/**
+ * MapRefProvider — exposes the map instance for zoom/center buttons outside MapContainer.
+ */
+function MapRefProvider({ onMapReady }: { onMapReady: (map: L.Map) => void }) {
+  const map = useMap();
+  useEffect(() => {
+    onMapReady(map);
+  }, [map, onMapReady]);
+  return null;
+}
+
 interface DrainageNetworkProps {
   searchFilter?: string;
 }
 
 export default function DrainageNetwork({ searchFilter = '' }: DrainageNetworkProps) {
   const [selectedAsset, setSelectedAsset] = useState<any>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [progress, setProgress] = useState(0);
+
   const [waterways, setWaterways] = useState<any[]>([]);
   const [waterwayStats, setWaterwayStats] = useState<any>(null);
   const [nullahs, setNullahs] = useState<any[]>([]);
@@ -46,7 +108,8 @@ export default function DrainageNetwork({ searchFilter = '' }: DrainageNetworkPr
   const [isLegendExpanded, setIsLegendExpanded] = useState(false);
   const [isListExpanded, setIsListExpanded] = useState(true);
   const [aiData, setAiData] = useState<any>(null);
-  const [map, setMap] = useState<any>(null);
+  const [aiPinLocation, setAiPinLocation] = useState<any>(null);
+  const [mapRef, setMapRef] = useState<L.Map | null>(null);
   const [isDarkMap, setIsDarkMap] = useState<boolean>(() => {
     return document.documentElement.getAttribute('data-theme') === 'dark';
   });
@@ -97,15 +160,7 @@ export default function DrainageNetwork({ searchFilter = '' }: DrainageNetworkPr
     loadData();
   }, [filterType]);
 
-  useEffect(() => {
-    let interval: any;
-    if (isPlaying) {
-      interval = setInterval(() => {
-        setProgress((prev) => (prev >= 100 ? 0 : prev + 1));
-      }, 120);
-    }
-    return () => clearInterval(interval);
-  }, [isPlaying]);
+
 
   const handleSelectWaterway = async (ww: any) => {
     if (ww.osm_id) {
@@ -118,6 +173,10 @@ export default function DrainageNetwork({ searchFilter = '' }: DrainageNetworkPr
     } else {
       setSelectedAsset(ww);
     }
+  };
+
+  const handleLocationReceived = (loc: any) => {
+    setAiPinLocation(loc);
   };
 
   const currentSearchTerm = (localSearch || searchFilter || '').toLowerCase();
@@ -140,8 +199,11 @@ export default function DrainageNetwork({ searchFilter = '' }: DrainageNetworkPr
             zoom={12} 
             style={{ width: '100%', height: '100%' }}
             zoomControl={false}
-            ref={setMap}
           >
+            {/* Map controller for AI fly-to commands */}
+            <MapController onLocationReceived={handleLocationReceived} />
+            <MapRefProvider onMapReady={setMapRef} />
+
             <TileLayer
               key={isDarkMap ? 'dark-map' : 'light-map'}
               attribution='&copy; OpenStreetMap CartoDB'
@@ -199,6 +261,119 @@ export default function DrainageNetwork({ searchFilter = '' }: DrainageNetworkPr
                  </Tooltip>
                </Marker>
             ))}
+
+            {/* AI Pin-point Location Marker */}
+            {aiPinLocation && (
+              <>
+                {/* Pulsing radius circle for visual emphasis */}
+                <Circle
+                  center={[aiPinLocation.lat, aiPinLocation.lng]}
+                  radius={300}
+                  pathOptions={{
+                    color: '#3B82F6',
+                    fillColor: '#3B82F6',
+                    fillOpacity: 0.08,
+                    weight: 2,
+                    opacity: 0.3,
+                    dashArray: '8 4',
+                  }}
+                />
+                <Circle
+                  center={[aiPinLocation.lat, aiPinLocation.lng]}
+                  radius={150}
+                  pathOptions={{
+                    color: '#3B82F6',
+                    fillColor: '#3B82F6',
+                    fillOpacity: 0.12,
+                    weight: 2,
+                    opacity: 0.5,
+                  }}
+                />
+                <Marker 
+                  position={[aiPinLocation.lat, aiPinLocation.lng]} 
+                  icon={pinIcon}
+                >
+                  <Popup 
+                    maxWidth={320}
+                    className="ai-location-popup"
+                  >
+                    <div style={{ fontFamily: 'system-ui, -apple-system, sans-serif', minWidth: '280px' }}>
+                      {/* Header */}
+                      <div style={{ 
+                        background: 'linear-gradient(135deg, #3B82F6, #1D4ED8)',
+                        color: 'white',
+                        padding: '12px 14px',
+                        borderRadius: '8px 8px 0 0',
+                        margin: '-14px -14px 12px -14px',
+                      }}>
+                        <div style={{ fontSize: '13px', fontWeight: '700', letterSpacing: '0.3px' }}>
+                          📍 {aiPinLocation.location_name}
+                        </div>
+                        <div style={{ fontSize: '10px', opacity: 0.85, marginTop: '2px' }}>
+                          {aiPinLocation.zone} Nagpur • {aiPinLocation.lat.toFixed(4)}°N, {aiPinLocation.lng.toFixed(4)}°E
+                        </div>
+                      </div>
+
+                      {/* Description */}
+                      <div style={{ fontSize: '11px', color: '#374151', lineHeight: '1.5', marginBottom: '10px', padding: '0 2px' }}>
+                        {aiPinLocation.description}
+                      </div>
+
+                      {/* Data Grid */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', padding: '0 2px' }}>
+                        {aiPinLocation.area_data && Object.entries({
+                          '🏔️ Elevation': aiPinLocation.area_data.elevation_range_m ? `${aiPinLocation.area_data.elevation_range_m}m` : 'N/A',
+                          '🌊 Flood Risk': aiPinLocation.area_data.flood_susceptibility || 'N/A',
+                          '💧 Water Body': aiPinLocation.area_data.nearest_water_body || 'N/A',
+                          '🪨 Soil': aiPinLocation.area_data.soil_type ? (aiPinLocation.area_data.soil_type.length > 20 ? aiPinLocation.area_data.soil_type.slice(0, 20) + '…' : aiPinLocation.area_data.soil_type) : 'N/A',
+                          '⛰️ Lithology': aiPinLocation.area_data.lithology || 'N/A',
+                          '🏗️ Land Use': aiPinLocation.area_data.land_use ? (aiPinLocation.area_data.land_use.length > 20 ? aiPinLocation.area_data.land_use.slice(0, 20) + '…' : aiPinLocation.area_data.land_use) : 'N/A',
+                          '🌧️ Rainfall': `${aiPinLocation.area_data.annual_rainfall_mm || 1205}mm/yr`,
+                          '🚰 Drainage': `${aiPinLocation.area_data.drainage_coverage_pct || 35}%`,
+                        }).map(([label, value]) => (
+                          <div key={label} style={{
+                            background: '#F8FAFC',
+                            border: '1px solid #E2E8F0',
+                            borderRadius: '6px',
+                            padding: '6px 8px',
+                          }}>
+                            <div style={{ fontSize: '9px', color: '#94A3B8', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                              {label}
+                            </div>
+                            <div style={{ fontSize: '11px', color: '#1E293B', fontWeight: '600', marginTop: '2px' }}>
+                              {value}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Footer */}
+                      <div style={{ 
+                        marginTop: '10px', 
+                        paddingTop: '8px', 
+                        borderTop: '1px solid #E2E8F0',
+                        fontSize: '9px', 
+                        color: '#94A3B8',
+                        textAlign: 'center',
+                        padding: '8px 2px 0 2px',
+                      }}>
+                        Data: VNIT Frequency Ratio Model (Gaurkhede & Adane 2023) • NMC Records • OSM
+                      </div>
+                    </div>
+                  </Popup>
+                  <Tooltip permanent direction="top" offset={[0, -50]}>
+                    <div style={{ fontFamily: 'system-ui, -apple-system, sans-serif', padding: '2px 4px' }}>
+                      <span style={{ fontWeight: 700, fontSize: '12px', color: '#1D4ED8' }}>
+                        📍 {aiPinLocation.location_name}
+                      </span>
+                      <span style={{ display: 'block', fontSize: '9px', color: '#6B7280', marginTop: '1px' }}>
+                        {aiPinLocation.zone} • Flood Risk: {aiPinLocation.area_data?.flood_susceptibility || 'N/A'}
+                      </span>
+                    </div>
+                  </Tooltip>
+                </Marker>
+              </>
+            )}
           </MapContainer>
         </div>
 
@@ -253,6 +428,71 @@ export default function DrainageNetwork({ searchFilter = '' }: DrainageNetworkPr
                 </div>
               )}
             </div>
+
+            {/* AI Location Info Card — shown when a location is pinned */}
+            {aiPinLocation && (
+              <div className="glass-panel rounded-xl p-3 w-64 shadow-lg border-l-4 border-l-blue-500 animate-in slide-in-from-left-4 duration-300">
+                <div className="flex justify-between items-start mb-2">
+                  <div className="flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-blue-500" />
+                    <span className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">AI Pinned Location</span>
+                  </div>
+                  <button 
+                    onClick={() => setAiPinLocation(null)}
+                    className="text-[var(--text-muted)] hover:text-[var(--text-primary)] p-0.5 rounded transition-colors"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+                <h3 className="text-sm font-bold text-[var(--text-primary)] leading-tight">
+                  {aiPinLocation.location_name}
+                </h3>
+                <span className="text-[10px] text-[var(--text-secondary)] block mt-0.5">
+                  {aiPinLocation.zone} Nagpur
+                </span>
+                <div className="mt-2 grid grid-cols-2 gap-1.5">
+                  <div className="bg-[var(--bg-app)] px-2 py-1 rounded border border-[var(--border-subtle)]">
+                    <span className="text-[8px] font-bold text-[var(--text-muted)] uppercase block">Flood Risk</span>
+                    <span className={`text-[10px] font-bold ${
+                      aiPinLocation.area_data?.flood_susceptibility?.includes('Very High') ? 'text-red-500' :
+                      aiPinLocation.area_data?.flood_susceptibility?.includes('High') ? 'text-orange-500' :
+                      aiPinLocation.area_data?.flood_susceptibility?.includes('Moderate') ? 'text-yellow-600' :
+                      'text-green-500'
+                    }`}>
+                      {aiPinLocation.area_data?.flood_susceptibility || 'N/A'}
+                    </span>
+                  </div>
+                  <div className="bg-[var(--bg-app)] px-2 py-1 rounded border border-[var(--border-subtle)]">
+                    <span className="text-[8px] font-bold text-[var(--text-muted)] uppercase block">Elevation</span>
+                    <span className="text-[10px] font-semibold text-[var(--text-primary)]">
+                      {aiPinLocation.area_data?.elevation_range_m || 'N/A'}m
+                    </span>
+                  </div>
+                  <div className="bg-[var(--bg-app)] px-2 py-1 rounded border border-[var(--border-subtle)]">
+                    <span className="text-[8px] font-bold text-[var(--text-muted)] uppercase block">Drainage</span>
+                    <span className="text-[10px] font-semibold text-[var(--text-primary)]">
+                      {aiPinLocation.area_data?.drainage_coverage_pct || 35}%
+                    </span>
+                  </div>
+                  <div className="bg-[var(--bg-app)] px-2 py-1 rounded border border-[var(--border-subtle)]">
+                    <span className="text-[8px] font-bold text-[var(--text-muted)] uppercase block">Rainfall</span>
+                    <span className="text-[10px] font-semibold text-[var(--text-primary)]">
+                      {aiPinLocation.area_data?.annual_rainfall_mm || 1205}mm
+                    </span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    if (mapRef) {
+                      mapRef.flyTo([aiPinLocation.lat, aiPinLocation.lng], aiPinLocation.zoom || 16, { duration: 1.5 });
+                    }
+                  }}
+                  className="mt-2 w-full text-[10px] font-semibold text-blue-500 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 py-1.5 rounded-lg transition-colors text-center"
+                >
+                  Re-center on Location →
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Top Right: Waterways List & Details Panel */}
@@ -372,21 +612,21 @@ export default function DrainageNetwork({ searchFilter = '' }: DrainageNetworkPr
         {/* Map Control Buttons Stack (Zoom In, Zoom Out, Center) */}
         <div className="absolute right-4 bottom-24 z-20 flex flex-col gap-1.5 pointer-events-auto">
           <button 
-            onClick={() => map?.zoomIn()} 
+            onClick={() => mapRef?.zoomIn()} 
             className="btn-control shadow-md" 
             title="Zoom In"
           >
             <Plus className="w-4 h-4" />
           </button>
           <button 
-            onClick={() => map?.zoomOut()} 
+            onClick={() => mapRef?.zoomOut()} 
             className="btn-control shadow-md" 
             title="Zoom Out"
           >
             <Minus className="w-4 h-4" />
           </button>
           <button 
-            onClick={() => map?.flyTo([21.1458, 79.0882], 12)} 
+            onClick={() => mapRef?.flyTo([21.1458, 79.0882], 12)} 
             className="btn-control shadow-md" 
             title="Center Map on Nagpur"
           >
@@ -394,42 +634,7 @@ export default function DrainageNetwork({ searchFilter = '' }: DrainageNetworkPr
           </button>
         </div>
 
-        {/* Floating Simulation Timeline Controls */}
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-[90%] max-w-xl glass-panel rounded-xl p-3 flex items-center gap-3 z-20 shadow-xl pointer-events-auto border border-[var(--border-subtle)]">
-          <button 
-            onClick={() => setIsPlaying(!isPlaying)} 
-            className="w-9 h-9 rounded-lg bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-white flex items-center justify-center shadow-sm shrink-0 transition-colors"
-          >
-            {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 fill-current ml-0.5" />}
-          </button>
 
-          <div 
-            className="flex-1 relative h-4 flex items-center group cursor-pointer"
-            onClick={(e) => {
-              const rect = e.currentTarget.getBoundingClientRect();
-              const val = ((e.clientX - rect.left) / rect.width) * 100;
-              setProgress(Math.max(0, Math.min(100, val)));
-            }}
-          >
-            <div className="w-full h-1.5 bg-[var(--border-subtle)] rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-[var(--color-primary)] rounded-full transition-all ease-linear"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
-            <div 
-              className="absolute w-3.5 h-3.5 rounded-full bg-[var(--bg-surface)] border-2 border-[var(--color-primary)] shadow-md group-hover:scale-125 transition-transform"
-              style={{ left: `calc(${progress}% - 7px)` }}
-            />
-          </div>
-
-          <div className="font-mono text-xs text-[var(--text-secondary)] shrink-0 w-28 text-right">
-            <span>24h Sim</span>
-            <span className="block text-[10px] text-[var(--color-primary)] font-bold">
-              {Math.floor((progress / 100) * 24)}h : {Math.floor((progress % (100/24))/(100/24)*60).toString().padStart(2, '0')}m
-            </span>
-          </div>
-        </div>
       </main>
     </div>
   );

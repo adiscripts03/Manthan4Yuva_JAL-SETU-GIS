@@ -3,11 +3,10 @@ import Sidebar from '../components/Sidebar';
 import { getFloodEvents, getFloodLocations, getCityMetadata } from '../services/api';
 import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Play, Pause, Activity, ChevronDown, ChevronUp } from 'lucide-react';
+import { Activity, ChevronDown, ChevronUp } from 'lucide-react';
 
 export default function RainfallIntelligence() {
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [timelineIndex, setTimelineIndex] = useState(0);
+
   const [selectedCorrelation, setSelectedCorrelation] = useState<string | null>(null);
   const [floodLocations, setFloodLocations] = useState<any[]>([]);
   const [floodEvents, setFloodEvents] = useState<any[]>([]);
@@ -55,15 +54,7 @@ export default function RainfallIntelligence() {
     loadData();
   }, []);
 
-  useEffect(() => {
-    let interval: any;
-    if (isPlaying) {
-      interval = setInterval(() => {
-        setTimelineIndex((prev) => (prev >= 100 ? 0 : prev + 1));
-      }, 150);
-    }
-    return () => clearInterval(interval);
-  }, [isPlaying]);
+
 
   useEffect(() => {
     if (map && selectedCorrelation) {
@@ -201,34 +192,7 @@ export default function RainfallIntelligence() {
           )}
         </div>
 
-        {/* Bottom Scrubber Timeline */}
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-[90%] max-w-xl glass-panel rounded-xl p-3 flex items-center gap-3 z-20 shadow-xl border border-[var(--border-subtle)]">
-          <button 
-            onClick={() => setIsPlaying(!isPlaying)} 
-            className="w-9 h-9 rounded-lg bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-white flex items-center justify-center shadow-sm shrink-0 transition-colors"
-          >
-            {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 fill-current ml-0.5" />}
-          </button>
 
-          <div className="flex-1 relative h-4 flex items-center group cursor-pointer" onClick={(e) => {
-            const rect = e.currentTarget.getBoundingClientRect();
-            setTimelineIndex(((e.clientX - rect.left) / rect.width) * 100);
-          }}>
-            <div className="w-full h-1.5 bg-[var(--border-subtle)] rounded-full overflow-hidden">
-              <div className="h-full bg-[var(--color-primary)] rounded-full transition-all ease-linear" style={{ width: `${timelineIndex}%` }} />
-            </div>
-            <div 
-              className="absolute w-3.5 h-3.5 rounded-full bg-[var(--bg-surface)] border-2 border-[var(--color-primary)] shadow-md group-hover:scale-125 transition-transform"
-              style={{ left: `calc(${timelineIndex}% - 7px)` }}
-            />
-          </div>
-
-          <div className="font-mono text-xs text-[var(--text-secondary)] shrink-0 w-24 text-right">
-            <span>
-              {2019 + Math.floor((timelineIndex / 100) * 7)} {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][Math.floor((timelineIndex % 15) / 1.25)] || 'Jan'}
-            </span>
-          </div>
-        </div>
       </main>
     </div>
   );

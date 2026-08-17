@@ -1,13 +1,19 @@
-import React, { useState } from 'react';
-import { X, MapPin, Send } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { X, MapPin, Send, Navigation, AlertTriangle } from 'lucide-react';
 
 export default function MapSyncChatbot() {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const [messages, setMessages] = useState<{role: 'user' | 'ai', text: string}[]>([
-    { role: 'ai', text: 'Hi! I am the Map Sync Agent. Describe a condition (e.g. "Show me the condition of Manish Nagar" or "Pili Nadi rainfall is 40mm") and I will instantly project it onto the map for you!' }
+    { role: 'ai', text: '👋 Hi! I am the Map Intelligence Agent.\n\nTell me any area name in Nagpur and I\'ll fly you there on the map with full topological data!\n\nTry: "Show me Manish Nagar" or "Navigate to Dharampeth" or just type "Sitabuldi"' }
   ]);
+
+  // Auto-scroll to bottom on new messages
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -22,33 +28,60 @@ export default function MapSyncChatbot() {
       const res = await fetch('http://localhost:5050/api/ai/agent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: userMsg, forced_intent: 'data_upload' })
+        body: JSON.stringify({ query: userMsg })
       });
       const data = await res.json();
       
       let aiResponseText = "";
       if (data.success) {
-         aiResponseText = `✅ ${data.summary || 'Command processed and map synchronized.'}`;
-         if (data.result) {
-            const synthData = {
-              ...data.result,
-              synthetic_markers: [
-                { id: "ai_mark_1", lat: 21.1065, lng: 79.0658, desc: "AI Detected Area of Interest" }
-              ]
-            };
-            window.dispatchEvent(new CustomEvent('ai_map_sync', { detail: synthData }));
-            if (!window.location.pathname.includes('/drainage')) {
-               window.location.href = '/drainage';
+        if (data.map_location) {
+          // ── Map Query Response: Fly to location ──
+          const loc = data.map_location;
+          
+          // Dispatch event to map for fly-to and pin
+          window.dispatchEvent(new CustomEvent('ai_map_location', { 
+            detail: {
+              location_name: loc.location_name,
+              lat: loc.lat,
+              lng: loc.lng,
+              zoom: loc.zoom,
+              zone: loc.zone,
+              description: loc.description,
+              area_data: loc.area_data,
             }
-         }
+          }));
+
+          // Navigate to drainage page if not already there
+          if (!window.location.pathname.includes('/drainage')) {
+            window.location.href = '/drainage';
+          }
+
+          aiResponseText = data.summary || `📍 Navigating to ${loc.location_name}`;
+        } else if (data.result) {
+          // ── Data Upload Response ──
+          const synthData = {
+            ...data.result,
+            synthetic_markers: [
+              { id: "ai_mark_1", lat: 21.1065, lng: 79.0658, desc: "AI Detected Area of Interest" }
+            ]
+          };
+          window.dispatchEvent(new CustomEvent('ai_map_sync', { detail: synthData }));
+          if (!window.location.pathname.includes('/drainage')) {
+            window.location.href = '/drainage';
+          }
+          aiResponseText = `✅ ${data.summary || 'Command processed and map synchronized.'}`;
+        } else {
+          // ── Support / other response ──
+          aiResponseText = `${data.summary || 'Request processed.'}`;
+        }
       } else {
-        aiResponseText = `❌ Error: ${data.error?.message || 'Processing failed.'}`;
+        aiResponseText = `❌ Error: ${data.error?.message || data.errors?.[0] || 'Processing failed.'}`;
       }
 
       setMessages(prev => [...prev, { role: 'ai', text: aiResponseText }]);
     } catch (e) {
       console.error(e);
-      setMessages(prev => [...prev, { role: 'ai', text: "❌ Network error: Platform unreachable Service unavailable." }]);
+      setMessages(prev => [...prev, { role: 'ai', text: "❌ Network error: Platform unreachable. Make sure the backend server is running." }]);
     } finally {
       setIsLoading(false);
     }
@@ -57,16 +90,16 @@ export default function MapSyncChatbot() {
   return (
     <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end font-sans">
       {isOpen && (
-        <div className="mb-4 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-2xl w-[350px] h-[450px] flex flex-col shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 duration-300 transition-colors">
+        <div className="mb-4 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-2xl w-[380px] h-[480px] flex flex-col shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 duration-300 transition-colors">
           {/* Header */}
           <div className="bg-[var(--bg-surface-elevated)] border-b border-[var(--border-subtle)] p-3 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 flex items-center justify-center bg-[var(--color-soft-blue)] rounded-full text-[var(--color-primary)] border border-[var(--color-primary)]/20">
-                <MapPin size={16} />
+                <Navigation size={16} />
               </div>
               <div>
                 <h3 className="text-[var(--text-primary)] text-xs font-bold tracking-wide">Map Intelligence Agent</h3>
-                <span className="text-[9px] text-[var(--color-natural-green)] font-semibold uppercase">Online</span>
+                <span className="text-[9px] text-[var(--color-natural-green)] font-semibold uppercase">Online • Type any area name</span>
               </div>
             </div>
             <button 
@@ -92,23 +125,47 @@ export default function MapSyncChatbot() {
             ))}
             {isLoading && (
               <div className="flex self-start max-w-[85%]">
-                 <div className="p-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-tl-sm flex items-center gap-1.5">
+                 <div className="p-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-tl-sm flex items-center gap-2">
+                    <Navigation size={12} className="text-[var(--color-primary)] animate-pulse" />
+                    <span className="text-[10px] text-[var(--text-secondary)]">Locating on map...</span>
                     <span className="w-1.5 h-1.5 bg-[var(--color-primary)] rounded-full animate-bounce"></span>
                     <span className="w-1.5 h-1.5 bg-[var(--color-primary)] rounded-full animate-bounce" style={{ animationDelay: '150ms'}}></span>
                     <span className="w-1.5 h-1.5 bg-[var(--color-primary)] rounded-full animate-bounce" style={{ animationDelay: '300ms'}}></span>
                  </div>
               </div>
             )}
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Quick Suggestions */}
+          <div className="px-3 py-1.5 bg-[var(--bg-surface)] border-t border-[var(--border-subtle)] flex gap-1.5 overflow-x-auto custom-scrollbar shrink-0">
+            {['Manish Nagar', 'Dharampeth', 'Pili Nadi', 'Sitabuldi'].map((suggestion) => (
+              <button
+                key={suggestion}
+                onClick={() => {
+                  setQuery(suggestion);
+                  // Auto-submit
+                  setTimeout(() => {
+                    const form = document.getElementById('map-agent-form') as HTMLFormElement;
+                    form?.requestSubmit();
+                  }, 50);
+                }}
+                disabled={isLoading}
+                className="px-2.5 py-1 rounded-full text-[10px] font-semibold whitespace-nowrap bg-[var(--bg-app)] text-[var(--text-secondary)] hover:text-[var(--color-primary)] hover:bg-[var(--color-soft-blue)] transition-colors border border-[var(--border-subtle)] disabled:opacity-50"
+              >
+                📍 {suggestion}
+              </button>
+            ))}
           </div>
 
           {/* Input Area */}
           <div className="p-3 bg-[var(--bg-surface)] border-t border-[var(--border-subtle)] shrink-0">
-            <form onSubmit={handleSubmit} className="flex gap-2">
+            <form id="map-agent-form" onSubmit={handleSubmit} className="flex gap-2">
               <input 
                  type="text"
                  value={query}
                  onChange={(e) => setQuery(e.target.value)}
-                 placeholder="Command map sync..."
+                 placeholder="Type any Nagpur area name..."
                  className="flex-1 bg-[var(--bg-app)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] px-3 py-2 rounded-lg outline-none focus:border-[var(--color-primary)] transition-colors placeholder:text-[var(--text-muted)]"
                  disabled={isLoading}
               />

@@ -24,6 +24,7 @@ router.post('/agent', async (req, res, next) => {
       intent: finalState.intent,
       summary: finalState.summary,
       preview_url: finalState.preview_url,
+      map_location: finalState.map_location || null,
       result: finalState.email_draft ? 'Email sent to operator support' : finalState.report_data,
       errors: finalState.errors
     });
