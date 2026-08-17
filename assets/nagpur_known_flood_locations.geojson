@@ -1,0 +1,137 @@
+{
+  "type": "FeatureCollection",
+  "_note": "PROXY / SEED dataset — NOT the 127 historical flood points from Gaurkhede & Adane (2023). Those were never published as coordinates and could not be digitized from Figure 3 (no image access in this environment). This is a substitute layer built from (a) real news-reported flood-affected areas from the 2026-07-28 event, geocoded via Google Places, and (b) named nullah/water-channel reference points where they resolved to a real indexed place. All coordinates are place-level centroids (sublocality or landmark), not precise flood-point locations. Use for map seeding/demo only; label as 'estimated / area-level' in your flood_events or flood_zones collections, not as verified historical submergence points.",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Narendra Nagar",
+        "category": "flood_affected_area",
+        "source_event": "2026-07-28 flood",
+        "data_confidence": "estimated"
+      },
+      "geometry": { "type": "Point", "coordinates": [79.0772749, 21.1041408] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Manish Nagar",
+        "category": "flood_affected_area",
+        "source_event": "2026-07-28 flood",
+        "data_confidence": "estimated"
+      },
+      "geometry": { "type": "Point", "coordinates": [79.0750138, 21.0938434] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Loha Pul",
+        "category": "flood_affected_area",
+        "note": "Also a known chronic waterlogging bridge point per citizen reviews ('water logging issue beneath this pool is also a big problem')",
+        "source_event": "2026-07-28 flood",
+        "data_confidence": "estimated"
+      },
+      "geometry": { "type": "Point", "coordinates": [79.0884757, 21.1451354] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Swavalambi Nagar",
+        "category": "flood_affected_area",
+        "source_event": "2026-07-28 flood",
+        "data_confidence": "estimated"
+      },
+      "geometry": { "type": "Point", "coordinates": [79.0420789, 21.1047963] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Besa",
+        "category": "flood_affected_area",
+        "source_event": "2026-07-28 flood",
+        "data_confidence": "estimated"
+      },
+      "geometry": { "type": "Point", "coordinates": [79.0892996, 21.0865191] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Beltarodi",
+        "category": "flood_affected_area",
+        "source_event": "2026-07-28 flood",
+        "data_confidence": "estimated"
+      },
+      "geometry": { "type": "Point", "coordinates": [79.0772159, 21.0752108] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Mhalgi Nagar",
+        "category": "flood_affected_area",
+        "source_event": "2026-07-28 flood",
+        "data_confidence": "estimated"
+      },
+      "geometry": { "type": "Point", "coordinates": [79.1231002, 21.106855] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Narsala",
+        "category": "flood_affected_area",
+        "source_event": "2026-07-28 flood",
+        "data_confidence": "estimated"
+      },
+      "geometry": { "type": "Point", "coordinates": [79.1341091, 21.0905223] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Omkar Nagar",
+        "category": "flood_affected_area",
+        "source_event": "2026-07-28 flood",
+        "data_confidence": "estimated"
+      },
+      "geometry": { "type": "Point", "coordinates": [79.0925695, 21.0989087] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Hudkeshwar",
+        "category": "flood_affected_area",
+        "source_event": "2026-07-28 flood",
+        "data_confidence": "estimated"
+      },
+      "geometry": { "type": "Point", "coordinates": [79.1223807, 21.1008126] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Jaitala",
+        "category": "flood_affected_area",
+        "source_event": "2026-07-28 flood",
+        "data_confidence": "estimated"
+      },
+      "geometry": { "type": "Point", "coordinates": [79.0235386, 21.1099561] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rahul Nagar Nallah (area ref.)",
+        "category": "named_nullah_reference",
+        "note": "Ward 16, near Gauri Apartment, Somalwada per NMC boundary text",
+        "data_confidence": "estimated"
+      },
+      "geometry": { "type": "Point", "coordinates": [79.0734096, 21.1125898] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Pili Nadi (near Armour's Township ref.)",
+        "category": "named_nullah_reference",
+        "note": "Ward 1/2 boundary reference point; Armour's Township used as nearest resolvable landmark",
+        "data_confidence": "estimated"
+      },
+      "geometry": { "type": "Point", "coordinates": [79.0995126, 21.1932814] }
+    }
+  ]
+}

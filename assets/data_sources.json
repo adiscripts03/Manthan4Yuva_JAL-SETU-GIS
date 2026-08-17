@@ -1,0 +1,67 @@
+[
+  {
+    "id": "osm_overpass_drainage",
+    "name": "OpenStreetMap Overpass Drainage",
+    "provider": "OpenStreetMap contributors via Overpass API",
+    "status": "ingested",
+    "refresh_method": "assets/fetch_drainage_osm.py",
+    "asset": "assets/nagpur_drainage.geojson",
+    "records": 282,
+    "coverage": "Nagpur city and immediate surrounds",
+    "license": "ODbL",
+    "url": "https://overpass-api.de/api/interpreter",
+    "notes": "Surface waterways, rivers, canals, streams, drains and ditches. Minor drains depend on OSM mapping completeness."
+  },
+  {
+    "id": "known_flood_locations",
+    "name": "Known Flood Hotspots",
+    "provider": "Compiled project asset from public reports and local flood references",
+    "status": "ingested",
+    "refresh_method": "manual GeoJSON update or geocode_hotspots.py when hotspots_seed.csv is available",
+    "asset": "assets/nagpur_known_flood_locations.geojson",
+    "records": 13,
+    "coverage": "Known Nagpur waterlogging and flood-affected locations",
+    "license": "Project dataset with per-feature source notes",
+    "url": null,
+    "notes": "Coordinates are estimated point references, not flood extent polygons."
+  },
+  {
+    "id": "vnit_frequency_ratio_model",
+    "name": "VNIT Frequency Ratio Flood Susceptibility Model",
+    "provider": "Gaurkhede and Adane (2023), VNIT Nagpur",
+    "status": "ingested",
+    "refresh_method": "static peer-reviewed model tables in nagpur_flood_data.json",
+    "asset": "assets/nagpur_flood_data.json",
+    "records": 10,
+    "coverage": "Nagpur flood susceptibility parameters",
+    "license": "Citation required",
+    "url": "https://aloki.hu/pdf/2103_23412361.pdf",
+    "notes": "Frequency Ratio tables power the risk model and topography explorer."
+  },
+  {
+    "id": "imd_weather_api",
+    "name": "IMD Weather and Rainfall APIs",
+    "provider": "India Meteorological Department",
+    "status": "credentials_required",
+    "refresh_method": "server-side API integration after IMD API key/JWT is available",
+    "asset": null,
+    "records": 0,
+    "coverage": "Official weather, nowcast, AWS/ARG and rainfall products",
+    "license": "IMD API terms",
+    "url": "https://api.imd.gov.in/public/api_reference.html",
+    "notes": "Endpoints were verified but return 401 without credentials. Do not show as live data until keys are configured."
+  },
+  {
+    "id": "natmo_nagpur",
+    "name": "NATMO Nagpur Planning Map",
+    "provider": "National Atlas and Thematic Mapping Organisation",
+    "status": "candidate_source",
+    "refresh_method": "manual GIS download or WFS integration after service validation",
+    "asset": null,
+    "records": 0,
+    "coverage": "Nagpur district planning map metadata",
+    "license": "Government of India data terms",
+    "url": "https://geoportal.natmo.gov.in/dataset/nagpur",
+    "notes": "Useful candidate for administrative or thematic context; not yet ingested into the app."
+  }
+]
