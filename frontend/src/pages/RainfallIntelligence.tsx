@@ -13,6 +13,7 @@ export default function RainfallIntelligence() {
   const [cityData, setCityData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [map, setMap] = useState<any>(null);
+  const [isTelemetryMinimized, setIsTelemetryMinimized] = useState(false);
 
   useEffect(() => {
     async function loadData() {
@@ -114,70 +115,75 @@ export default function RainfallIntelligence() {
       </main>
 
       {/* Right Side Panel */}
-      <div className="hidden lg:flex absolute right-margin-page top-24 bottom-[88px] w-[340px] z-30 glass-panel rounded-xl flex-col shadow-2xl overflow-hidden">
-        <div className="px-gutter py-panel-padding border-b border-outline-variant/20 bg-surface/50">
-          <h2 className="font-headline-md text-headline-md text-primary glow-text flex items-center gap-2">
+      <div className={`hidden lg:flex absolute right-margin-page top-24 w-[340px] z-30 glass-panel rounded-xl flex-col shadow-2xl overflow-hidden transition-all ${isTelemetryMinimized ? 'h-[72px]' : 'bottom-[88px]'}`}>
+        <div className="px-gutter py-panel-padding border-b border-outline-variant/20 bg-surface/50 flex justify-between items-center">
+          <h2 className="font-headline-md text-headline-md text-primary glow-text flex items-center gap-2 mb-0">
             <span className="material-symbols-outlined text-[24px]">radar</span>
             Telemetry
           </h2>
+          <button onClick={() => setIsTelemetryMinimized(!isTelemetryMinimized)} className="text-on-surface-variant hover:text-primary transition-colors">
+            <span className="material-symbols-outlined">{isTelemetryMinimized ? 'expand_more' : 'expand_less'}</span>
+          </button>
         </div>
-        <div className={`flex-1 overflow-y-auto p-gutter flex flex-col gap-margin-page transition-opacity ${loading ? 'opacity-50' : ''}`}>
-          {/* Rainfall Intensity */}
-          <div className="flex flex-col gap-stack-gap">
-            <div className="flex justify-between items-end mb-1">
-              <h3 className="font-label-caps text-label-caps text-on-surface-variant tracking-widest">Rainfall Data</h3>
-              <span className="flex items-center gap-1 font-label-caps text-label-caps text-primary-fixed-dim bg-primary/10 px-2 py-0.5 rounded border border-primary/20">
-                <span className="w-1.5 h-1.5 bg-primary-fixed-dim rounded-full animate-pulse"></span> LIVE
-              </span>
-            </div>
-            <div className="bg-surface-container-low border border-outline-variant/30 rounded-lg p-panel-padding relative overflow-hidden group">
-              <div className="absolute inset-0 bg-gradient-to-br from-primary-container/5 to-transparent pointer-events-none"></div>
-              <div className="font-data-mono text-data-mono text-on-surface-variant flex flex-col gap-2 relative z-10">
-                <div className="flex justify-between items-center border-b border-outline-variant/20 pb-2">
-                  <span>ANNUAL_AVG</span>
-                  <span className="text-primary font-bold text-[16px] glow-text">{avgRainfall} mm</span>
-                </div>
-                <div className="flex justify-between items-center border-b border-outline-variant/20 pb-2">
-                  <span>FLOOD_EVENTS</span>
-                  <span className="text-secondary-fixed">{floodEvents.length} documented</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span>HOTSPOTS</span>
-                  <span className="text-error">{floodLocations.length} locations</span>
+        {!isTelemetryMinimized && (
+          <div className={`flex-1 overflow-y-auto p-gutter flex flex-col gap-margin-page transition-opacity ${loading ? 'opacity-50' : ''}`}>
+            {/* Rainfall Intensity */}
+            <div className="flex flex-col gap-stack-gap">
+              <div className="flex justify-between items-end mb-1">
+                <h3 className="font-label-caps text-label-caps text-on-surface-variant tracking-widest">Rainfall Data</h3>
+                <span className="flex items-center gap-1 font-label-caps text-label-caps text-primary-fixed-dim bg-primary/10 px-2 py-0.5 rounded border border-primary/20">
+                  <span className="w-1.5 h-1.5 bg-primary-fixed-dim rounded-full animate-pulse"></span> LIVE
+                </span>
+              </div>
+              <div className="bg-surface-container-low border border-outline-variant/30 rounded-lg p-panel-padding relative overflow-hidden group">
+                <div className="absolute inset-0 bg-gradient-to-br from-primary-container/5 to-transparent pointer-events-none"></div>
+                <div className="font-data-mono text-data-mono text-on-surface-variant flex flex-col gap-2 relative z-10">
+                  <div className="flex justify-between items-center border-b border-outline-variant/20 pb-2">
+                    <span>ANNUAL_AVG</span>
+                    <span className="text-primary font-bold text-[16px] glow-text">{avgRainfall} mm</span>
+                  </div>
+                  <div className="flex justify-between items-center border-b border-outline-variant/20 pb-2">
+                    <span>FLOOD_EVENTS</span>
+                    <span className="text-secondary-fixed">{floodEvents.length} documented</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span>HOTSPOTS</span>
+                    <span className="text-error">{floodLocations.length} locations</span>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          {/* Flood Hotspots Correlation */}
-          <div className="flex flex-col gap-stack-gap">
-            <h3 className="font-label-caps text-label-caps text-on-surface-variant tracking-widest">Flood Hotspots (Click to locate)</h3>
-            <div className="flex flex-col gap-2">
-              {floodLocations.length > 0 ? floodLocations.slice(0, 5).map((loc: any, idx: number) => {
-                const isSelected = selectedCorrelation === loc.name;
-                const isHighRisk = loc.category?.toLowerCase().includes('chronic') || loc.category?.toLowerCase().includes('critical');
-                return (
-                  <div key={idx} onClick={() => setSelectedCorrelation(loc.name)}
-                    className={`bg-surface-container/50 border rounded-lg p-3 hover:bg-surface-container transition-colors cursor-pointer border-l-4 ${isSelected ? (isHighRisk ? 'border-error-container bg-error-container/10 border-l-error-container' : 'border-primary bg-primary/10 border-l-primary') : 'border-outline-variant/30 border-l-outline-variant/30'}`}>
-                    <div className="flex justify-between items-start mb-1">
-                      <span className="font-body-sm text-body-sm font-semibold text-on-surface">{loc.name}</span>
-                      <span className={`font-data-mono text-[10px] px-1.5 py-0.5 rounded ${isHighRisk ? 'text-error bg-error-container/20' : 'text-primary bg-primary/10'}`}>
-                        {loc.category?.toUpperCase() || 'FLOOD ZONE'}
-                      </span>
+            {/* Flood Hotspots Correlation */}
+            <div className="flex flex-col gap-stack-gap">
+              <h3 className="font-label-caps text-label-caps text-on-surface-variant tracking-widest">Flood Hotspots (Click to locate)</h3>
+              <div className="flex flex-col gap-2">
+                {floodLocations.length > 0 ? floodLocations.slice(0, 5).map((loc: any, idx: number) => {
+                  const isSelected = selectedCorrelation === loc.name;
+                  const isHighRisk = loc.category?.toLowerCase().includes('chronic') || loc.category?.toLowerCase().includes('critical');
+                  return (
+                    <div key={idx} onClick={() => setSelectedCorrelation(loc.name)}
+                      className={`bg-surface-container/50 border rounded-lg p-3 hover:bg-surface-container transition-colors cursor-pointer border-l-4 ${isSelected ? (isHighRisk ? 'border-error-container bg-error-container/10 border-l-error-container' : 'border-primary bg-primary/10 border-l-primary') : 'border-outline-variant/30 border-l-outline-variant/30'}`}>
+                      <div className="flex justify-between items-start mb-1">
+                        <span className="font-body-sm text-body-sm font-semibold text-on-surface">{loc.name}</span>
+                        <span className={`font-data-mono text-[10px] px-1.5 py-0.5 rounded ${isHighRisk ? 'text-error bg-error-container/20' : 'text-primary bg-primary/10'}`}>
+                          {loc.category?.toUpperCase() || 'FLOOD ZONE'}
+                        </span>
+                      </div>
+                      {loc.source_event && (
+                        <p className="font-body-sm text-[12px] text-on-surface-variant leading-tight mt-1">{loc.source_event}</p>
+                      )}
                     </div>
-                    {loc.source_event && (
-                      <p className="font-body-sm text-[12px] text-on-surface-variant leading-tight mt-1">{loc.source_event}</p>
-                    )}
+                  );
+                }) : (
+                  <div className="text-on-surface-variant text-[12px] font-data-mono">
+                    {loading ? 'Loading...' : 'No flood locations available. Seed the database.'}
                   </div>
-                );
-              }) : (
-                <div className="text-on-surface-variant text-[12px] font-data-mono">
-                  {loading ? 'Loading...' : 'No flood locations available. Seed the database.'}
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Bottom Timeline */}

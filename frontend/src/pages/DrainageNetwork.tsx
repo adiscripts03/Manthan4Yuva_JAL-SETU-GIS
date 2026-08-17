@@ -29,6 +29,8 @@ export default function DrainageNetwork() {
   const [nullahs, setNullahs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterType, setFilterType] = useState<string>('');
+  const [isLegendMinimized, setIsLegendMinimized] = useState(false);
+  const [isListMinimized, setIsListMinimized] = useState(false);
 
   useEffect(() => {
     async function loadData() {
@@ -126,61 +128,78 @@ export default function DrainageNetwork() {
 
         <div className="absolute inset-0 p-margin-page pointer-events-none flex justify-between items-start z-10">
           {/* Left: Legend Panel with real stats */}
-          <div className="glass-panel rounded-lg p-panel-padding w-72 pointer-events-auto flex flex-col gap-stack-gap max-h-[calc(100vh-100px)] overflow-y-auto">
-            <h3 className="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider mb-2">Network Legend</h3>
-            {waterwayStats && (
-              <div className="mb-2">
-                <div className="font-data-mono text-[11px] text-primary mb-2">Total: {waterwayStats.total} waterways</div>
-                {Object.entries(waterwayStats.by_type || {}).map(([type, count]: [string, any]) => (
-                  <div key={type}
-                    className={`flex items-center justify-between cursor-pointer hover:bg-surface-variant/30 p-1 rounded transition-colors ${filterType === type ? 'bg-primary/10' : ''}`}
-                    onClick={() => setFilterType(filterType === type ? '' : type)}
-                  >
-                    <div className="flex items-center gap-unit">
-                      <div className="w-6 h-1.5 rounded-full" style={{ backgroundColor: WATERWAY_COLORS[type] || WATERWAY_COLORS.unknown }}></div>
-                      <span className="font-data-mono text-data-mono text-on-surface capitalize">{type}</span>
-                    </div>
-                    <span className="font-data-mono text-data-mono text-on-surface-variant text-[10px]">{count}</span>
+          <div className={`glass-panel rounded-lg p-panel-padding w-72 pointer-events-auto flex flex-col gap-stack-gap transition-all ${isLegendMinimized ? 'h-[52px] overflow-hidden' : 'max-h-[calc(100vh-100px)] overflow-y-auto'}`}>
+            <div className="flex justify-between items-center mb-2">
+              <h3 className="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider mb-0">Network Legend</h3>
+              <button onClick={() => setIsLegendMinimized(!isLegendMinimized)} className="text-on-surface-variant hover:text-primary transition-colors">
+                <span className="material-symbols-outlined text-[18px]">{isLegendMinimized ? 'expand_more' : 'expand_less'}</span>
+              </button>
+            </div>
+            
+            {!isLegendMinimized && (
+              <>
+                {waterwayStats && (
+                  <div className="mb-2">
+                    <div className="font-data-mono text-[11px] text-primary mb-2">Total: {waterwayStats.total} waterways</div>
+                    {Object.entries(waterwayStats.by_type || {}).map(([type, count]: [string, any]) => (
+                      <div key={type}
+                        className={`flex items-center justify-between cursor-pointer hover:bg-surface-variant/30 p-1 rounded transition-colors ${filterType === type ? 'bg-primary/10' : ''}`}
+                        onClick={() => setFilterType(filterType === type ? '' : type)}
+                      >
+                        <div className="flex items-center gap-unit">
+                          <div className="w-6 h-1.5 rounded-full" style={{ backgroundColor: WATERWAY_COLORS[type] || WATERWAY_COLORS.unknown }}></div>
+                          <span className="font-data-mono text-data-mono text-on-surface capitalize">{type}</span>
+                        </div>
+                        <span className="font-data-mono text-data-mono text-on-surface-variant text-[10px]">{count}</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            )}
+                )}
 
-            {/* Named Nullahs */}
-            {nullahs.length > 0 && (
-              <div className="border-t border-outline-variant/20 pt-2">
-                <h4 className="font-label-caps text-[10px] text-on-surface-variant mb-2">NAMED NULLAHS ({nullahs.length})</h4>
-                <div className="flex flex-col gap-1 max-h-40 overflow-y-auto custom-scrollbar">
-                  {nullahs.map((n: any, idx: number) => (
-                    <div key={idx} className="text-[11px] font-data-mono text-on-surface-variant hover:text-primary cursor-pointer transition-colors max-w-full truncate">
-                      {n.name || n.nullah_name || `Nullah #${idx + 1}`}
+                {/* Named Nullahs */}
+                {nullahs.length > 0 && (
+                  <div className="border-t border-outline-variant/20 pt-2">
+                    <h4 className="font-label-caps text-[10px] text-on-surface-variant mb-2">NAMED NULLAHS ({nullahs.length})</h4>
+                    <div className="flex flex-col gap-1 max-h-40 overflow-y-auto custom-scrollbar">
+                      {nullahs.map((n: any, idx: number) => (
+                        <div key={idx} className="text-[11px] font-data-mono text-on-surface-variant hover:text-primary cursor-pointer transition-colors max-w-full truncate">
+                          {n.name || n.nullah_name || `Nullah #${idx + 1}`}
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
 
           {/* Right: Waterway List + Details */}
           <div className="flex flex-col gap-2 w-80 pointer-events-auto max-h-[calc(100vh-100px)] overflow-y-auto custom-scrollbar">
             {/* Waterway list */}
-            <div className="glass-panel rounded-lg p-panel-padding flex flex-col gap-2">
-              <h3 className="font-label-caps text-label-caps text-on-surface-variant mb-1">
-                WATERWAYS {filterType ? `(${filterType})` : ''} — {waterways.length}
-              </h3>
-              <div className={`flex flex-col gap-1 max-h-52 overflow-y-auto custom-scrollbar transition-opacity ${loading ? 'opacity-50' : ''}`}>
-                {waterways.slice(0, 30).map((ww: any, idx: number) => (
-                  <div key={idx}
-                    onClick={() => handleSelectWaterway(ww)}
-                    className={`text-[11px] font-data-mono p-2 rounded cursor-pointer transition-colors ${selectedAsset?.osm_id === ww.osm_id ? 'bg-primary/10 text-primary border border-primary/30' : 'text-on-surface-variant hover:bg-surface-variant/30 hover:text-on-surface'}`}
-                  >
-                    <div className="flex justify-between items-center w-full">
-                      <span className="truncate max-w-[150px]">{ww.name || ww.osm_id || `Segment ${idx + 1}`}</span>
-                      <span className="capitalize text-[9px] text-outline shrink-0">{ww.waterway}</span>
-                    </div>
-                  </div>
-                ))}
+            <div className={`glass-panel rounded-lg p-panel-padding flex flex-col gap-2 transition-all ${isListMinimized ? 'h-[52px] overflow-hidden' : ''}`}>
+              <div className="flex justify-between items-center mb-1">
+                <h3 className="font-label-caps text-label-caps text-on-surface-variant mb-0">
+                  WATERWAYS {filterType ? `(${filterType})` : ''} — {waterways.length}
+                </h3>
+                <button onClick={() => setIsListMinimized(!isListMinimized)} className="text-on-surface-variant hover:text-primary transition-colors">
+                  <span className="material-symbols-outlined text-[18px]">{isListMinimized ? 'expand_more' : 'expand_less'}</span>
+                </button>
               </div>
+              {!isListMinimized && (
+                <div className={`flex flex-col gap-1 max-h-52 overflow-y-auto custom-scrollbar transition-opacity ${loading ? 'opacity-50' : ''}`}>
+                  {waterways.slice(0, 30).map((ww: any, idx: number) => (
+                    <div key={idx}
+                      onClick={() => handleSelectWaterway(ww)}
+                      className={`text-[11px] font-data-mono p-2 rounded cursor-pointer transition-colors ${selectedAsset?.osm_id === ww.osm_id ? 'bg-primary/10 text-primary border border-primary/30' : 'text-on-surface-variant hover:bg-surface-variant/30 hover:text-on-surface'}`}
+                    >
+                      <div className="flex justify-between items-center w-full">
+                        <span className="truncate max-w-[150px]">{ww.name || ww.osm_id || `Segment ${idx + 1}`}</span>
+                        <span className="capitalize text-[9px] text-outline shrink-0">{ww.waterway}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Selected waterway details */}
