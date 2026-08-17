@@ -5,7 +5,8 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+dotenv.config({ path: path.resolve(__dirname, '../../.env') }); // try backend/.env
+dotenv.config({ path: path.resolve(__dirname, '../../../../.env') }); // try Jalsetu-main-3/.env
 
 
 export const config = {
@@ -17,6 +18,7 @@ export const config = {
     .split(',')
     .map(origin => origin.trim())
     .filter(Boolean),
+  groqApiKey: process.env.GROQ_API_KEY || '',
 };
 
 /**

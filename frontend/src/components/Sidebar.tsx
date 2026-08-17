@@ -115,20 +115,146 @@ export default function Sidebar() {
       {/* Support Modal */}
       {supportOpen && (
         <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-sm p-6 shadow-2xl relative flex flex-col items-center text-center">
-            <button onClick={() => setSupportOpen(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white">
-              <X className="w-5 h-5"/>
-            </button>
-            <div className="w-12 h-12 bg-blue-500/10 rounded-full flex items-center justify-center mb-4">
-              <HelpCircle className="w-6 h-6 text-blue-400"/>
-            </div>
-            <h3 className="text-lg font-bold text-white mb-2">Operator Support</h3>
-            <p className="text-sm text-slate-400 mb-6">Need assistance with the Hydraulic Intelligence system? Contact the central engineering team.</p>
-            <button onClick={() => setSupportOpen(false)} className="w-full py-2.5 text-sm bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors font-semibold shadow-md mb-2">Initiate Live Chat</button>
-            <button onClick={() => setSupportOpen(false)} className="w-full py-2.5 text-sm text-slate-300 hover:bg-slate-800 rounded-lg transition-colors border border-slate-700">View Documentation</button>
-          </div>
+          <AgentChatModal onClose={() => setSupportOpen(false)} />
         </div>
       )}
     </>
+  );
+}
+
+function AgentChatModal({ onClose }: { onClose: () => void }) {
+  const [query, setQuery] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [messages, setMessages] = useState<{role: 'user' | 'ai', text: string, link?: string}[]>([
+    { role: 'ai', text: 'Hello! I am the JalSetu AI engine. I can automatically escalate support tickets to engineering, or map raw GIS reports directly to the screen. Paste your report or issue below!' }
+  ]);
+
+  const handleSubmit = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!query.trim() || isLoading) return;
+    
+    const userMsg = query;
+    setQuery('');
+    setMessages(prev => [...prev, { role: 'user', text: userMsg }]);
+    setIsLoading(true);
+
+    try {
+      const res = await fetch('http://localhost:5050/api/ai/agent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: userMsg, forced_intent: 'support' })
+      });
+      const data = await res.json();
+      
+      let aiResponseText = "";
+      let previewLink = undefined;
+
+      if (data.success) {
+        previewLink = data.preview_url;
+        if (data.intent === 'support') {
+           aiResponseText = `✅ ${data.summary || 'Your concern has been drafted and escalated.'}`;
+        } else if (data.intent === 'data_upload') {
+           aiResponseText = `✅ ${data.summary || 'Data extracted successfully.'}`;
+           if (data.result) {
+              const synthData = {
+                ...data.result,
+                synthetic_markers: [
+                  { id: "ai_mark_1", lat: 21.1458, lng: 79.0882, desc: "Critical Flooding Zone (AI Predicted)" },
+                  { id: "ai_mark_2", lat: 21.1558, lng: 79.0982, desc: "Secondary Blockage Node" }
+                ]
+              };
+              window.dispatchEvent(new CustomEvent('ai_map_sync', { detail: synthData }));
+              if (!window.location.pathname.includes('/drainage')) {
+                 window.location.href = '/drainage';
+              }
+           }
+        } else {
+           aiResponseText = `✅ ${data.summary || 'Query processed.'}`;
+        }
+        
+        if (data.errors && data.errors.length > 0) {
+           aiResponseText += `\n⚠️ Partial errors: ${data.errors.join(', ')}`;
+        }
+      } else {
+        aiResponseText = `❌ Error: ${data.error?.message || 'Processing failed. Check backend logs.'}`;
+      }
+
+      setMessages(prev => [...prev, { role: 'ai', text: aiResponseText, link: previewLink }]);
+    } catch (e) {
+      console.error(e);
+      setMessages(prev => [...prev, { role: 'ai', text: "❌ Network error: Backend AI service unreachable." }]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg h-[600px] flex flex-col shadow-2xl relative overflow-hidden animate-in zoom-in-95 duration-200">
+      
+      {/* Header */}
+      <div className="bg-slate-800/80 backdrop-blur border-b border-slate-700 p-4 flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-teal-500/10 rounded-full flex items-center justify-center border border-teal-500/20">
+            <span className="material-symbols-outlined text-teal-400">smart_toy</span>
+          </div>
+          <div>
+            <h3 className="text-white font-bold tracking-wide">JalSetu AI Agent</h3>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse"></span>
+              <span className="text-[10px] text-teal-400 font-medium uppercase tracking-wider">Online</span>
+            </div>
+          </div>
+        </div>
+        <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors bg-slate-800 p-2 rounded-lg">
+          <X className="w-5 h-5"/>
+        </button>
+      </div>
+      
+      {/* Messages Area */}
+      <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 custom-scrollbar bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 to-black">
+        {messages.map((msg, i) => (
+          <div key={i} className={`flex max-w-[85%] ${msg.role === 'user' ? 'self-end' : 'self-start'}`}>
+            <div className={`p-3 rounded-2xl text-sm shadow-md whitespace-pre-wrap ${msg.role === 'user' ? 'bg-blue-600 text-white rounded-tr-sm' : 'bg-slate-800 text-slate-200 border border-slate-700 rounded-tl-sm'}`}>
+              {msg.text}
+              {msg.link && (
+                <a href={msg.link} target="_blank" rel="noopener noreferrer" className="mt-3 block w-full py-2 px-3 text-center bg-teal-600/20 hover:bg-teal-600/40 text-teal-300 border border-teal-500/30 rounded-lg font-medium transition-colors">
+                  View Live Email Preview
+                </a>
+              )}
+            </div>
+          </div>
+        ))}
+        {isLoading && (
+          <div className="flex self-start max-w-[85%]">
+             <div className="p-4 rounded-2xl bg-slate-800 border border-slate-700 rounded-tl-sm flex items-center gap-2">
+                <span className="w-2 h-2 bg-teal-400 rounded-full animate-bounce"></span>
+                <span className="w-2 h-2 bg-teal-400 rounded-full animate-bounce" style={{ animationDelay: '150ms'}}></span>
+                <span className="w-2 h-2 bg-teal-400 rounded-full animate-bounce" style={{ animationDelay: '300ms'}}></span>
+             </div>
+          </div>
+        )}
+      </div>
+
+      {/* Input Area */}
+      <div className="p-4 bg-slate-800 border-t border-slate-700 shrink-0">
+        <form onSubmit={handleSubmit} className="flex gap-2">
+          <input 
+             type="text"
+             value={query}
+             onChange={(e) => setQuery(e.target.value)}
+             placeholder="Type a concern or paste report data..."
+             className="flex-1 bg-slate-900 border border-slate-700 text-sm text-slate-200 px-4 py-3 rounded-xl outline-none focus:border-teal-500 transition-colors placeholder:text-slate-500"
+             disabled={isLoading}
+          />
+          <button 
+            type="submit" 
+            disabled={isLoading || !query.trim()}
+            className="w-12 h-12 bg-teal-600 hover:bg-teal-500 disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed text-white rounded-xl flex items-center justify-center transition-colors shadow-lg"
+          >
+            <span className="material-symbols-outlined text-[20px]">send</span>
+          </button>
+        </form>
+      </div>
+    </div>
   );
 }

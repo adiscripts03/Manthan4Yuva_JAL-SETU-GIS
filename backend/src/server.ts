@@ -18,6 +18,7 @@ import citizenReportsRouter from './routes/citizenReports.js';
 import interventionsRouter from './routes/interventions.js';
 import analyticsRouter from './routes/analytics.js';
 import dataSourcesRouter from './routes/dataSources.js';
+import aiRouter from './routes/ai.js';
 
 const app = express();
 
@@ -70,6 +71,7 @@ app.use('/api/citizen-reports', citizenReportsRouter);
 app.use('/api/interventions', interventionsRouter);
 app.use('/api/analytics', analyticsRouter);
 app.use('/api/data-sources', dataSourcesRouter);
+app.use('/api/ai', aiRouter);
 
 // ── API index ────────────────────────────────────────────
 app.get('/api', (_req, res) => {
@@ -100,6 +102,7 @@ app.get('/api', (_req, res) => {
       'interventions/update': 'PATCH /api/interventions/:id',
       analytics_summary: 'GET /api/analytics/summary',
       data_sources: 'GET /api/data-sources',
+      ai_agent: 'POST /api/ai/agent',
     },
   });
 });

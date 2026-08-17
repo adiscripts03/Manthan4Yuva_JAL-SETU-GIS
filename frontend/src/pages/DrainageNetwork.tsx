@@ -1,8 +1,17 @@
 import { useState, useEffect } from 'react';
 import Sidebar from '../components/Sidebar';
 import { getWaterways, getWaterwayStats, getNullahs, getWaterwayById } from '../services/api';
-import { MapContainer, TileLayer, Polyline, Tooltip } from 'react-leaflet';
+import { MapContainer, TileLayer, Polyline, Tooltip, Marker } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
+
+// Create a custom pulsing red icon for AI markers
+const aiIcon = new L.DivIcon({
+  className: 'custom-ai-icon',
+  html: `<div class="w-4 h-4 bg-red-500 rounded-full animate-ping absolute opacity-75"></div><div class="w-4 h-4 bg-red-600 border-2 border-white rounded-full relative shadow-[0_0_15px_rgba(220,38,38,1)]"></div>`,
+  iconSize: [16, 16],
+  iconAnchor: [8, 8]
+});
 
 const WATERWAY_COLORS: Record<string, string> = {
   river: '#173bab', // Dark blue
@@ -31,6 +40,19 @@ export default function DrainageNetwork() {
   const [filterType, setFilterType] = useState<string>('');
   const [isLegendMinimized, setIsLegendMinimized] = useState(false);
   const [isListMinimized, setIsListMinimized] = useState(false);
+  
+  // -- NEW: AI Data state --
+  const [aiData, setAiData] = useState<any>(null);
+
+  useEffect(() => {
+    // Listen for AI orchestration data pushes
+    const handleAiSync = (e: any) => {
+      console.log('Received AI Sync Data:', e.detail);
+      setAiData(e.detail);
+    };
+    window.addEventListener('ai_map_sync', handleAiSync);
+    return () => window.removeEventListener('ai_map_sync', handleAiSync);
+  }, []);
 
   useEffect(() => {
     async function loadData() {
@@ -104,25 +126,52 @@ export default function DrainageNetwork() {
               const positions = ww.geometry.coordinates.map((coord: [number, number]) => [coord[1], coord[0]]);
               const isSelected = selectedAsset && selectedAsset.osm_id === ww.osm_id;
               
+              // Highlight if matched by AI extraction string array
+              let isAITarget = false;
+              if (aiData && aiData.canals && ww.name) {
+                 isAITarget = aiData.canals.some((aiCanal: string) => 
+                     ww.name.toLowerCase().includes(aiCanal.toLowerCase()) || 
+                     aiCanal.toLowerCase().includes(ww.name.toLowerCase())
+                 );
+              }
+              
+              const finalColor = isAITarget ? '#ff3366' : isSelected ? '#00f2ff' : (WATERWAY_COLORS[ww.waterway] || WATERWAY_COLORS.unknown);
+              const finalWeight = isAITarget ? 8 : isSelected ? 6 : (WATERWAY_WEIGHTS[ww.waterway] || 2);
+              const finalOpacity = isAITarget ? 1 : isSelected ? 1 : (aiData?.canals?.length ? 0.2 : 0.7); // Dim non-targets if AI active
+
               return (
                 <Polyline 
                   key={`ww-${ww.osm_id}-${idx}`}
                   positions={positions}
-                  color={isSelected ? '#00f2ff' : (WATERWAY_COLORS[ww.waterway] || WATERWAY_COLORS.unknown)}
-                  weight={isSelected ? 6 : (WATERWAY_WEIGHTS[ww.waterway] || 2)}
-                  opacity={isSelected ? 1 : 0.7}
+                  color={finalColor}
+                  weight={finalWeight}
+                  opacity={finalOpacity}
                   eventHandlers={{
                     click: () => handleSelectWaterway(ww)
                   }}
-                  className={isSelected ? "drain-line" : ""}
+                  className={isAITarget ? "drain-line ai-glow" : (isSelected ? "drain-line" : "")}
                 >
                   <Tooltip sticky>
                     <span className="font-bold">{ww.name || 'Unnamed segment'}</span><br/>
                     <span className="text-xs text-on-surface-variant font-data-mono">ID: {ww.osm_id}</span>
+                    {isAITarget && <div className="text-[#ff3366] font-bold text-[10px] mt-1 border-t border-[#ff3366]/30 pt-1">⚡️ AI Data Extracted</div>}
                   </Tooltip>
                 </Polyline>
               );
             })}
+
+            {/* Render AI Synthetic Markers */}
+            {aiData?.synthetic_markers?.map((marker: any) => (
+               <Marker key={marker.id} position={[marker.lat, marker.lng]} icon={aiIcon}>
+                 <Tooltip permanent direction="top" className="bg-slate-900 border border-slate-700 text-white shadow-xl">
+                   <div className="flex flex-col gap-1 p-1">
+                     <span className="text-red-400 font-bold text-xs">⚠️ AI INFERENCE PENDING</span>
+                     <span className="text-slate-300 text-[10px]">{marker.desc}</span>
+                     {aiData.rainfall?.length > 0 && <span className="text-blue-300 text-[10px]">Rainfall est: {aiData.rainfall[0]}mm</span>}
+                   </div>
+                 </Tooltip>
+               </Marker>
+            ))}
           </MapContainer>
         </div>
 
