@@ -14,11 +14,11 @@ const aiIcon = new L.DivIcon({
 });
 
 const WATERWAY_COLORS: Record<string, string> = {
-  river: '#173bab', // Dark blue
-  stream: '#00dbe7', // Cyan
-  drain: '#00f2ff', // Bright cyan
-  canal: '#ffb783', // Orange/peach
-  unknown: '#49454f'
+  river: '#059669', // Rich Forest River Green
+  stream: '#34d399', // Bright Natural Stream Mint
+  drain: '#10b981', // Emerald Drain
+  canal: '#f59e0b', // Warm Golden Amber
+  unknown: '#52525b'
 };
 
 const WATERWAY_WEIGHTS: Record<string, number> = {
@@ -32,7 +32,7 @@ const WATERWAY_WEIGHTS: Record<string, number> = {
 export default function DrainageNetwork() {
   const [selectedAsset, setSelectedAsset] = useState<any>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [progress, setProgress] = useState(45);
+  const [progress, setProgress] = useState(0);
   const [waterways, setWaterways] = useState<any[]>([]);
   const [waterwayStats, setWaterwayStats] = useState<any>(null);
   const [nullahs, setNullahs] = useState<any[]>([]);
@@ -135,7 +135,7 @@ export default function DrainageNetwork() {
                  );
               }
               
-              const finalColor = isAITarget ? '#ff3366' : isSelected ? '#00f2ff' : (WATERWAY_COLORS[ww.waterway] || WATERWAY_COLORS.unknown);
+              const finalColor = isAITarget ? '#ff3366' : isSelected ? '#10b981' : (WATERWAY_COLORS[ww.waterway] || WATERWAY_COLORS.unknown);
               const finalWeight = isAITarget ? 8 : isSelected ? 6 : (WATERWAY_WEIGHTS[ww.waterway] || 2);
               const finalOpacity = isAITarget ? 1 : isSelected ? 1 : (aiData?.canals?.length ? 0.2 : 0.7); // Dim non-targets if AI active
 

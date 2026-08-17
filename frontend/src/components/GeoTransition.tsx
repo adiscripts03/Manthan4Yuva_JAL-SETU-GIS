@@ -67,7 +67,7 @@ function EarthController({ phase, setReady }: { phase: number, setReady: (v: boo
       {/* Atmosphere Glow */}
       <mesh ref={atmosphereRef}>
         <sphereGeometry args={[1.02, 64, 64]} />
-        <meshBasicMaterial color="#4477ff" transparent opacity={0.15} side={BackSide} blending={2} />
+        <meshBasicMaterial color="#10b981" transparent opacity={0.18} side={BackSide} blending={2} />
       </mesh>
     </group>
   );
@@ -115,7 +115,7 @@ export default function GeoTransition({ onComplete }: { onComplete?: () => void 
       await sleep(500);
       
       if (onComplete) onComplete();
-      navigate('/rainfall');
+      navigate('/drainage');
     };
 
     if (ready) {
@@ -150,9 +150,9 @@ export default function GeoTransition({ onComplete }: { onComplete?: () => void 
       {/* HUD & Overlays */}
       <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-8 sm:p-12">
         {/* Top left tech text */}
-        <div className={`font-mono text-xs sm:text-sm text-teal-400/80 transition-opacity duration-500 ${phase >= 1 ? 'opacity-100' : 'opacity-0'}`}>
+        <div className={`font-mono text-xs sm:text-sm text-emerald-400/80 transition-opacity duration-500 ${phase >= 1 ? 'opacity-100' : 'opacity-0'}`}>
           <div className="flex items-center gap-2 mb-1">
-            <div className="w-2 h-2 rounded-full bg-teal-500 animate-pulse" />
+            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             SYS.STATUS: ONLINE
           </div>
           <div>LAT: 21.1458° N</div>
@@ -162,17 +162,17 @@ export default function GeoTransition({ onComplete }: { onComplete?: () => void 
         {/* Center Crosshair / Marker */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center justify-center">
           {/* Target Reticle (always there but scales in) */}
-          <div className={`w-32 h-32 border border-teal-500/20 rounded-full flex items-center justify-center transition-all duration-1000 ${phase >= 3 ? 'scale-100 opacity-100' : 'scale-150 opacity-0'}`}>
-            <div className="w-1 h-4 bg-teal-500/40 absolute top-0" />
-            <div className="w-1 h-4 bg-teal-500/40 absolute bottom-0" />
-            <div className="w-4 h-1 bg-teal-500/40 absolute left-0" />
-            <div className="w-4 h-1 bg-teal-500/40 absolute right-0" />
+          <div className={`w-32 h-32 border border-emerald-500/20 rounded-full flex items-center justify-center transition-all duration-1000 ${phase >= 3 ? 'scale-100 opacity-100' : 'scale-150 opacity-0'}`}>
+            <div className="w-1 h-4 bg-emerald-500/40 absolute top-0" />
+            <div className="w-1 h-4 bg-emerald-500/40 absolute bottom-0" />
+            <div className="w-4 h-1 bg-emerald-500/40 absolute left-0" />
+            <div className="w-4 h-1 bg-emerald-500/40 absolute right-0" />
           </div>
 
           {/* Location Marker */}
           <div className={`absolute flex flex-col items-center transition-all duration-500 delay-300 ${phase >= 4 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-            <MapPin className="text-teal-400 w-8 h-8 mb-2 drop-shadow-[0_0_8px_rgba(45,212,191,0.8)]" />
-            <div className="bg-slate-900/80 backdrop-blur border border-teal-500/30 text-teal-400 px-4 py-1 rounded text-sm font-bold tracking-widest shadow-[0_0_15px_rgba(45,212,191,0.2)]">
+            <MapPin className="text-emerald-400 w-8 h-8 mb-2 drop-shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+            <div className="bg-slate-900/80 backdrop-blur border border-emerald-500/30 text-emerald-400 px-4 py-1 rounded text-sm font-bold tracking-widest shadow-[0_0_15px_rgba(16,185,129,0.2)]">
               NAGPUR
             </div>
           </div>
@@ -180,13 +180,13 @@ export default function GeoTransition({ onComplete }: { onComplete?: () => void 
 
         {/* Bottom Status Text */}
         <div className="text-center w-full">
-          <div className={`inline-block font-mono text-sm sm:text-base tracking-widest transition-all duration-300 ${phase === 5 ? 'text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.8)] animate-pulse' : 'text-teal-400/80'}`}>
+          <div className={`inline-block font-mono text-sm sm:text-base tracking-widest transition-all duration-300 ${phase === 5 ? 'text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.8)] animate-pulse' : 'text-emerald-400/80'}`}>
             {statusText}
           </div>
           {/* Progress bar */}
           <div className="w-64 h-1 bg-slate-800 mx-auto mt-4 rounded-full overflow-hidden">
             <div 
-              className="h-full bg-teal-500 transition-all duration-[8000ms] ease-linear"
+              className="h-full bg-emerald-500 transition-all duration-[8000ms] ease-linear"
               style={{ width: phase >= 1 ? '100%' : '0%' }}
             />
           </div>

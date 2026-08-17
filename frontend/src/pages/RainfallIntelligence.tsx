@@ -6,7 +6,7 @@ import 'leaflet/dist/leaflet.css';
 
 export default function RainfallIntelligence() {
   const [isPlaying, setIsPlaying] = useState(false);
-  const [timelineIndex, setTimelineIndex] = useState(85);
+  const [timelineIndex, setTimelineIndex] = useState(0);
   const [selectedCorrelation, setSelectedCorrelation] = useState<string | null>(null);
   const [floodLocations, setFloodLocations] = useState<any[]>([]);
   const [floodEvents, setFloodEvents] = useState<any[]>([]);
@@ -91,9 +91,9 @@ export default function RainfallIntelligence() {
                   center={pos}
                   radius={isSelected ? (isHighRisk ? 12 : 10) : (isHighRisk ? 8 : 6)}
                   pathOptions={{
-                    fillColor: isHighRisk ? '#ffb4ab' : '#00f2ff',
+                    fillColor: isHighRisk ? '#f59e0b' : '#10b981',
                     fillOpacity: isSelected ? 0.8 : 0.5,
-                    color: isHighRisk ? '#ffb4ab' : '#00f2ff',
+                    color: isHighRisk ? '#f59e0b' : '#10b981',
                     weight: isSelected ? 3 : 1
                   }}
                   eventHandlers={{
