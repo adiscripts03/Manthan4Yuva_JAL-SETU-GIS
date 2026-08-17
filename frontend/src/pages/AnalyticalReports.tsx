@@ -6,8 +6,9 @@ import {
   getFloodLocations,
   getWaterwayStats,
   getWards,
+  createAnalysisReport,
 } from '../services/api';
-import { FileText, Cpu, Printer, Calendar, MapPin, Layers, AlertCircle, CheckCircle } from 'lucide-react';
+import { FileText, Cpu, Printer, Calendar, MapPin, Layers, AlertCircle, CheckCircle, ShieldCheck } from 'lucide-react';
 import jsPDF from 'jspdf';
 
 // ─── Types ────────────────────────────────────────────────
@@ -129,6 +130,8 @@ export default function AnalyticalReports() {
   const [reportConfig, setReportConfig] = useState<ReportConfig | null>(null); // what was used to build the last report
   const [generating, setGenerating] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [recordedTxHash, setRecordedTxHash] = useState<string | null>(null);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // ── Ref to the printable region ──
@@ -264,6 +267,7 @@ export default function AnalyticalReports() {
     const result = computeReport(ward, startDate, endDate, overlays);
     setReportData(result);
     setReportConfig({ ward, startDate, endDate, overlays });
+    setRecordedTxHash(null); // Reset blockchain state for new report
     setGenerating(false);
   }
 
@@ -627,6 +631,34 @@ export default function AnalyticalReports() {
     setTimeout(() => setToast(null), 4000);
   }
 
+  // ─── Action: Record on Blockchain ─────────────────────
+  async function handleRecordBlockchain() {
+    if (!reportData || !reportConfig) return;
+    setRecording(true);
+    try {
+      const payload = {
+        ward: reportConfig.ward,
+        startDate: reportConfig.startDate,
+        endDate: reportConfig.endDate,
+        overlays: reportConfig.overlays,
+        ...reportData
+      };
+      
+      const res = await createAnalysisReport(payload);
+      
+      if (res.success && res.data.blockchain?.status === 'confirmed') {
+        setRecordedTxHash(res.data.blockchain.tx_hash);
+        showToast('success', `Report securely recorded on-chain (${res.data.blockchain.tx_hash.slice(0, 10)}...)`);
+      } else {
+        showToast('error', res.data.blockchain?.error || 'Failed to record on blockchain.');
+      }
+    } catch (err) {
+      showToast('error', `Recording failed: ${(err as Error).message}`);
+    } finally {
+      setRecording(false);
+    }
+  }
+
   // ─── Derived action plan ─────────────────────────────
   function buildActionPlan(rd: ReportData, ovl: typeof overlays) {
     const items: { title: string; metric: string; detail: string }[] = [];
@@ -853,6 +885,34 @@ export default function AnalyticalReports() {
               ) : (
                 <>
                   <Printer className="w-4 h-4 text-[var(--text-secondary)]" /> Export PDF Report
+                </>
+              )}
+            </button>
+
+            {/* ── Record on Blockchain button ── */}
+            <button
+              className={`w-full border text-xs font-semibold py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 ${
+                recordedTxHash
+                  ? 'bg-[var(--color-soft-green)] text-[var(--color-natural-green)] border-[var(--color-natural-green)]/30 hover:bg-[var(--color-soft-green)]'
+                  : 'bg-[var(--bg-app)] border-[var(--border-subtle)] hover:bg-[var(--bg-surface-elevated)] text-[var(--text-primary)]'
+              } disabled:opacity-40 disabled:cursor-not-allowed`}
+              type="button"
+              onClick={handleRecordBlockchain}
+              disabled={recording || !reportData || !!recordedTxHash}
+              title={recordedTxHash ? 'Already recorded on blockchain' : (!reportData ? 'Run analysis first to record it' : '')}
+            >
+              {recording ? (
+                <>
+                  <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                  Recording…
+                </>
+              ) : recordedTxHash ? (
+                <>
+                  <CheckCircle className="w-4 h-4" /> Recorded On-Chain
+                </>
+              ) : (
+                <>
+                  <ShieldCheck className="w-4 h-4 text-[var(--color-primary)]" /> Record on Blockchain
                 </>
               )}
             </button>

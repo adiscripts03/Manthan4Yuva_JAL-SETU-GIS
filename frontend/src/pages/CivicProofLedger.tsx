@@ -1,37 +1,45 @@
 import { useState, useEffect } from 'react';
 import Sidebar from '../components/Sidebar';
-import { getInterventions, getGovernmentResponse, getCitizenReports, getBlockchainStatus, verifyOnChain } from '../services/api';
-import { ShieldCheck, Copy, Check, ExternalLink, Activity, Layers } from 'lucide-react';
+import { getInterventions, getGovernmentResponse, getCitizenReports, getBlockchainStatus, verifyOnChain, getAnalysisReports } from '../services/api';
+import { ShieldCheck, Copy, Check, ExternalLink, Activity, Layers, FileText } from 'lucide-react';
 
 export default function CivicProofLedger() {
   const [copied, setCopied] = useState(false);
   const [verifying, setVerifying] = useState(false);
-  const [interventions, setInterventions] = useState<any[]>([]);
+  const [records, setRecords] = useState<any[]>([]);
   const [govResponse, setGovResponse] = useState<any>(null);
   const [citizenReports, setCitizenReports] = useState<any[]>([]);
-  const [selectedIntervention, setSelectedIntervention] = useState<any>(null);
+  const [selectedRecord, setSelectedRecord] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [chainStatus, setChainStatus] = useState<any>({ enabled: false, total_proofs_on_chain: null });
   const [verifyResult, setVerifyResult] = useState<any>(null);
 
   useEffect(() => {
     setVerifyResult(null);
-  }, [selectedIntervention]);
+  }, [selectedRecord]);
 
   useEffect(() => {
     async function loadData() {
       try {
-        const [intRes, govRes, crRes, chainRes] = await Promise.all([
+        const [intRes, reportRes, govRes, crRes, chainRes] = await Promise.all([
           getInterventions(),
+          getAnalysisReports().catch(() => ({ data: [] })),
           getGovernmentResponse(),
           getCitizenReports({ limit: 20 }),
           getBlockchainStatus().catch(() => ({ data: { enabled: false } })),
         ]);
-        setInterventions(intRes.data || []);
+        const mappedInterventions = (intRes.data || []).map((i: any) => ({ ...i, _recordType: 'interventions' }));
+        const mappedReports = (reportRes.data || []).map((r: any) => ({ ...r, _recordType: 'analysis-reports' }));
+        const merged = [...mappedInterventions, ...mappedReports].sort((a, b) => {
+          const aDate = new Date(a.created_at || 0).getTime();
+          const bDate = new Date(b.created_at || 0).getTime();
+          return bDate - aDate;
+        });
+        setRecords(merged);
         setGovResponse(govRes.data || null);
         setCitizenReports(crRes.data || []);
         setChainStatus(chainRes.data || { enabled: false });
-        if (intRes.data?.length > 0) setSelectedIntervention(intRes.data[0]);
+        if (merged.length > 0) setSelectedRecord(merged[0]);
       } catch (e) {
         console.error('Failed to load civic ledger data:', e);
       } finally {
@@ -48,11 +56,12 @@ export default function CivicProofLedger() {
   };
 
   const handleVerify = async () => {
-    if (!selectedIntervention?._id) return;
+    if (!selectedRecord?._id) return;
     setVerifying(true);
     setVerifyResult(null);
     try {
-      const res = await verifyOnChain('interventions', selectedIntervention._id);
+      const collection = selectedRecord._recordType || 'interventions';
+      const res = await verifyOnChain(collection, selectedRecord._id);
       setVerifyResult(res.data);
     } catch (err: any) {
       setVerifyResult({ onChain: false, error: err.message || 'Verification failed' });
@@ -86,47 +95,80 @@ export default function CivicProofLedger() {
               </p>
             </div>
 
-            {/* Selected Intervention or Gov Response Overview */}
+            {/* Selected Record or Gov Response Overview */}
             <div className="bg-[var(--bg-surface)] border border-[var(--border-subtle)] p-6 rounded-2xl shadow-sm transition-colors">
-              {selectedIntervention ? (
-                <>
-                  <div className="flex items-start justify-between mb-4">
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <Activity className="w-4 h-4 text-[var(--color-natural-green)]" />
-                        <span className="text-[10px] uppercase font-bold text-[var(--color-natural-green)] tracking-wider">
-                          {selectedIntervention.work_order_id || 'INTERVENTION'}
-                        </span>
+              {selectedRecord ? (
+                selectedRecord._recordType === 'analysis-reports' ? (
+                  <>
+                    <div className="flex items-start justify-between mb-4">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <FileText className="w-4 h-4 text-[var(--color-primary)]" />
+                          <span className="text-[10px] uppercase font-bold text-[var(--color-primary)] tracking-wider">
+                            ANALYSIS REPORT
+                          </span>
+                        </div>
+                        <h2 className="text-lg font-bold text-[var(--text-primary)]">Ward: {selectedRecord.ward} Analysis</h2>
                       </div>
-                      <h2 className="text-lg font-bold text-[var(--text-primary)]">{selectedIntervention.description || 'Intervention Details'}</h2>
+                      <span className="px-3 py-1 rounded-full text-xs font-mono font-semibold tracking-wide bg-[var(--color-soft-blue)] text-[var(--color-primary)] border border-[var(--color-primary)]/30">
+                        {new Date(selectedRecord.created_at).toLocaleDateString()}
+                      </span>
                     </div>
-                    <span className={`px-3 py-1 rounded-full text-xs font-mono font-semibold tracking-wide ${
-                      selectedIntervention.status === 'completed' ? 'bg-[var(--color-soft-green)] text-[var(--color-natural-green)] border border-[var(--color-natural-green)]/30' :
-                      selectedIntervention.status === 'in_progress' ? 'bg-amber-100 text-amber-800 border border-amber-300' :
-                      'bg-[var(--bg-app)] text-[var(--text-secondary)] border border-[var(--border-subtle)]'
-                    }`}>
-                      {(selectedIntervention.status || 'UNKNOWN').toUpperCase().replace('_', ' ')}
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="bg-[var(--bg-app)] p-3 border border-[var(--border-subtle)] rounded-xl">
-                      <span className="block text-[10px] font-bold text-[var(--text-muted)] mb-1 uppercase tracking-widest">Type</span>
-                      <span className="text-xs font-mono text-[var(--text-primary)] capitalize">{selectedIntervention.type}</span>
-                    </div>
-                    {selectedIntervention.cost_estimate && (
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <div className="bg-[var(--bg-app)] p-3 border border-[var(--border-subtle)] rounded-xl">
-                        <span className="block text-[10px] font-bold text-[var(--text-muted)] mb-1 uppercase tracking-widest">Cost Estimate</span>
-                        <span className="text-xs font-mono text-[var(--text-primary)]">₹{selectedIntervention.cost_estimate.toLocaleString()}</span>
+                        <span className="block text-[10px] font-bold text-[var(--text-muted)] mb-1 uppercase tracking-widest">Period</span>
+                        <span className="text-xs font-mono text-[var(--text-primary)]">{selectedRecord.startDate} - {selectedRecord.endDate}</span>
                       </div>
-                    )}
-                    {selectedIntervention.waterway_osm_id && (
-                      <div className="bg-[var(--bg-app)] p-3 border border-[var(--border-subtle)] rounded-xl col-span-2">
-                        <span className="block text-[10px] font-bold text-[var(--text-muted)] mb-1 uppercase tracking-widest">Linked Waterway</span>
-                        <span className="text-xs font-mono text-[var(--color-primary)]">{selectedIntervention.waterway_osm_id}</span>
+                      <div className="bg-[var(--bg-app)] p-3 border border-[var(--border-subtle)] rounded-xl">
+                        <span className="block text-[10px] font-bold text-[var(--text-muted)] mb-1 uppercase tracking-widest">Hotspots</span>
+                        <span className="text-xs font-mono text-[var(--text-primary)]">{selectedRecord.hotspots}</span>
                       </div>
-                    )}
-                  </div>
-                </>
+                      <div className="bg-[var(--bg-app)] p-3 border border-[var(--border-subtle)] rounded-xl">
+                        <span className="block text-[10px] font-bold text-[var(--text-muted)] mb-1 uppercase tracking-widest">Events</span>
+                        <span className="text-xs font-mono text-[var(--text-primary)]">{selectedRecord.events}</span>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-start justify-between mb-4">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <Activity className="w-4 h-4 text-[var(--color-natural-green)]" />
+                          <span className="text-[10px] uppercase font-bold text-[var(--color-natural-green)] tracking-wider">
+                            {selectedRecord.work_order_id || 'INTERVENTION'}
+                          </span>
+                        </div>
+                        <h2 className="text-lg font-bold text-[var(--text-primary)]">{selectedRecord.description || 'Intervention Details'}</h2>
+                      </div>
+                      <span className={`px-3 py-1 rounded-full text-xs font-mono font-semibold tracking-wide ${
+                        selectedRecord.status === 'completed' ? 'bg-[var(--color-soft-green)] text-[var(--color-natural-green)] border border-[var(--color-natural-green)]/30' :
+                        selectedRecord.status === 'in_progress' ? 'bg-amber-100 text-amber-800 border border-amber-300' :
+                        'bg-[var(--bg-app)] text-[var(--text-secondary)] border border-[var(--border-subtle)]'
+                      }`}>
+                        {(selectedRecord.status || 'UNKNOWN').toUpperCase().replace('_', ' ')}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="bg-[var(--bg-app)] p-3 border border-[var(--border-subtle)] rounded-xl">
+                        <span className="block text-[10px] font-bold text-[var(--text-muted)] mb-1 uppercase tracking-widest">Type</span>
+                        <span className="text-xs font-mono text-[var(--text-primary)] capitalize">{selectedRecord.type}</span>
+                      </div>
+                      {selectedRecord.cost_estimate && (
+                        <div className="bg-[var(--bg-app)] p-3 border border-[var(--border-subtle)] rounded-xl">
+                          <span className="block text-[10px] font-bold text-[var(--text-muted)] mb-1 uppercase tracking-widest">Cost Estimate</span>
+                          <span className="text-xs font-mono text-[var(--text-primary)]">₹{selectedRecord.cost_estimate.toLocaleString()}</span>
+                        </div>
+                      )}
+                      {selectedRecord.waterway_osm_id && (
+                        <div className="bg-[var(--bg-app)] p-3 border border-[var(--border-subtle)] rounded-xl col-span-2">
+                          <span className="block text-[10px] font-bold text-[var(--text-muted)] mb-1 uppercase tracking-widest">Linked Waterway</span>
+                          <span className="text-xs font-mono text-[var(--color-primary)]">{selectedRecord.waterway_osm_id}</span>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )
               ) : (
                 <>
                   <div className="flex items-start justify-between mb-4">
@@ -169,8 +211,8 @@ export default function CivicProofLedger() {
                 <div className="bg-[var(--bg-app)] p-4 rounded-xl border border-[var(--border-subtle)] mb-6">
                   <span className="block text-[10px] font-bold text-[var(--text-muted)] mb-2 uppercase tracking-widest">Immutable Ledger Hash Record</span>
                   <div className="flex items-center justify-between gap-4 font-mono text-xs text-[var(--color-primary)] font-semibold break-all p-3 bg-[var(--bg-surface)] rounded-lg border border-[var(--border-subtle)] select-all">
-                    <code>{selectedIntervention?.blockchain?.data_hash || (selectedIntervention ? `0x_pending_verification_${selectedIntervention._id}` : '0x_awaiting_intervention_data')}</code>
-                    <button onClick={() => handleCopy(selectedIntervention?.blockchain?.data_hash || selectedIntervention?._id || '')} className="text-[var(--text-muted)] hover:text-[var(--color-primary)] transition-colors shrink-0">
+                    <code>{selectedRecord?.blockchain?.data_hash || (selectedRecord ? `0x_pending_verification_${selectedRecord._id}` : '0x_awaiting_record_data')}</code>
+                    <button onClick={() => handleCopy(selectedRecord?.blockchain?.data_hash || selectedRecord?._id || '')} className="text-[var(--text-muted)] hover:text-[var(--color-primary)] transition-colors shrink-0">
                       {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
                     </button>
                   </div>
@@ -180,7 +222,7 @@ export default function CivicProofLedger() {
                     <span className="block text-[10px] font-bold text-[var(--text-muted)] mb-1 uppercase tracking-widest">Records On-Chain</span>
                     <span className="text-xs font-mono text-[var(--text-primary)] flex items-center gap-2">
                       <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-natural-green)] animate-pulse"></span>
-                      {chainStatus.total_proofs_on_chain ?? interventions.length} records
+                      {chainStatus.total_proofs_on_chain ?? records.length} records
                     </span>
                   </div>
                   <div>
@@ -224,8 +266,8 @@ export default function CivicProofLedger() {
                   )}
                 </button>
 
-                {selectedIntervention?.blockchain?.explorer_url && (
-                  <a href={selectedIntervention.blockchain.explorer_url} target="_blank" rel="noreferrer" className="mt-3 w-full flex items-center justify-center gap-2 px-6 py-2.5 bg-transparent hover:bg-[var(--bg-app)] border border-[var(--border-subtle)] text-[var(--text-primary)] transition-all text-xs font-bold rounded-xl uppercase tracking-wider shadow-sm hover:opacity-80">
+                {selectedRecord?.blockchain?.explorer_url && (
+                  <a href={selectedRecord.blockchain.explorer_url} target="_blank" rel="noreferrer" className="mt-3 w-full flex items-center justify-center gap-2 px-6 py-2.5 bg-transparent hover:bg-[var(--bg-app)] border border-[var(--border-subtle)] text-[var(--text-primary)] transition-all text-xs font-bold rounded-xl uppercase tracking-wider shadow-sm hover:opacity-80">
                     <span>Inspect on Blockchain Explorer</span><ExternalLink className="w-4 h-4" />
                   </a>
                 )}
@@ -233,45 +275,49 @@ export default function CivicProofLedger() {
             </div>
           </div>
 
-          {/* Right Column: Timeline from Interventions */}
+          {/* Right Column: Timeline from Interventions and Reports */}
           <div className="lg:w-[380px] bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-2xl p-6 flex flex-col shadow-sm transition-colors text-[var(--text-primary)]">
             <h3 className="text-base font-bold text-[var(--text-primary)] mb-4 border-b border-[var(--border-subtle)] pb-3 flex items-center gap-2">
-              <Activity className="w-4 h-4 text-[var(--color-primary)]" />
-              {interventions.length > 0 ? 'Intervention Records' : 'Lifecycle Verification'}
+              <Layers className="w-4 h-4 text-[var(--color-primary)]" />
+              {records.length > 0 ? 'Blockchain Records' : 'Lifecycle Verification'}
             </h3>
             
             <div className="relative flex-1 pl-4 pt-2 overflow-y-auto custom-scrollbar pr-2">
               <div className="absolute left-[7px] top-4 bottom-4 w-px bg-[var(--border-subtle)]"></div>
               
               <div className="space-y-4 relative z-10 pb-4">
-                {interventions.length > 0 ? interventions.map((intv: any, idx: number) => {
-                  const isCompleted = intv.status === 'completed';
+                {records.length > 0 ? records.map((rec: any, idx: number) => {
+                  const isReport = rec._recordType === 'analysis-reports';
+                  const isCompleted = isReport || rec.status === 'completed';
                   return (
-                    <div key={intv._id || idx} className="relative cursor-pointer bg-[var(--bg-app)] p-3 rounded-xl border border-[var(--border-subtle)] hover:border-[var(--color-primary)]/40 transition-colors" onClick={() => setSelectedIntervention(intv)}>
+                    <div key={rec._id || idx} className="relative cursor-pointer bg-[var(--bg-app)] p-3 rounded-xl border border-[var(--border-subtle)] hover:border-[var(--color-primary)]/40 transition-colors" onClick={() => setSelectedRecord(rec)}>
                       <div className={`absolute -left-4 w-2.5 h-2.5 rounded-full border-2 border-[var(--bg-surface)] top-3 ${isCompleted ? 'bg-[var(--color-natural-green)]' : 'bg-[var(--color-primary)]'}`}></div>
                       <div className="flex flex-col sm:flex-row sm:items-baseline justify-between mb-1 gap-1">
-                        <h4 className={`text-xs font-bold ${isCompleted ? 'text-[var(--color-natural-green)]' : 'text-[var(--text-primary)]'}`}>
-                          {intv.work_order_id || intv.description?.slice(0, 35) || 'Intervention'}
+                        <h4 className={`text-xs font-bold ${isCompleted ? 'text-[var(--color-natural-green)]' : 'text-[var(--text-primary)]'} flex items-center gap-1`}>
+                          {isReport && <FileText className="w-3 h-3" />}
+                          {isReport ? `Ward ${rec.ward} Analysis` : (rec.work_order_id || rec.description?.slice(0, 35) || 'Intervention')}
                         </h4>
                         <span className="font-mono text-[10px] text-[var(--text-muted)] shrink-0">
-                          {intv.created_at ? new Date(intv.created_at).toLocaleDateString() : ''}
+                          {rec.created_at ? new Date(rec.created_at).toLocaleDateString() : ''}
                         </span>
                       </div>
-                      <p className="text-xs text-[var(--text-secondary)] mb-2">{intv.description}</p>
+                      <p className="text-xs text-[var(--text-secondary)] mb-2">
+                        {isReport ? `Analysis Report for ${rec.startDate} - ${rec.endDate}` : rec.description}
+                      </p>
                       <div className="flex items-center gap-2">
                         <span className={`text-[9px] font-bold tracking-wider px-2 py-0.5 rounded ${
                           isCompleted ? 'bg-[var(--color-soft-green)] text-[var(--color-natural-green)]' :
-                          intv.status === 'in_progress' ? 'bg-amber-100 text-amber-800' :
+                          rec.status === 'in_progress' ? 'bg-amber-100 text-amber-800' :
                           'bg-[var(--bg-surface)] text-[var(--text-secondary)] border border-[var(--border-subtle)]'
                         }`}>
-                          {(intv.status || '').toUpperCase().replace('_', ' ')}
+                          {isReport ? 'ON-CHAIN' : (rec.status || '').toUpperCase().replace('_', ' ')}
                         </span>
-                        <span className="text-[9px] font-mono text-[var(--text-muted)] capitalize">{intv.type}</span>
+                        {!isReport && <span className="text-[9px] font-mono text-[var(--text-muted)] capitalize">{rec.type}</span>}
                       </div>
                     </div>
                   );
                 }) : (
-                  <div className="text-xs text-[var(--text-secondary)]">No interventions yet.</div>
+                  <div className="text-xs text-[var(--text-secondary)]">No records yet.</div>
                 )}
               </div>
             </div>

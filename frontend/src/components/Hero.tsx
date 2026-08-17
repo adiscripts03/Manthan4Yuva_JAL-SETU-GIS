@@ -1,45 +1,6 @@
 import { useState, useCallback } from 'react'
-import { ArrowRight, Droplet, Map, CloudRain, ShieldCheck } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 import GeoTransition from './GeoTransition'
-
-const telemetryFeatures = [
-  {
-    index: '01',
-    category: 'HYDRAULIC',
-    icon: Droplet,
-    label: 'Drainage',
-    metric: '3,420 km Mapped',
-    status: 'Flow Vectors Active',
-    path: '/drainage',
-  },
-  {
-    index: '02',
-    category: 'METEOROLOGY',
-    icon: CloudRain,
-    label: 'Rainwater',
-    metric: '18 Sensor Catchments',
-    status: 'Precipitation Live',
-    path: '/rainfall',
-  },
-  {
-    index: '03',
-    category: 'GEOSPATIAL',
-    icon: Map,
-    label: 'Topography',
-    metric: '1m DEM Elevation',
-    status: 'Contours & Slopes',
-    path: '/topography',
-  },
-  {
-    index: '04',
-    category: 'IMMUTABLE AUDIT',
-    icon: ShieldCheck,
-    label: 'CivicProof Ledger',
-    metric: '100% Verified Blocks',
-    status: 'Cryptographic Record',
-    path: '/civic-proof',
-  },
-]
 
 export default function Hero() {
   const [showTransition, setShowTransition] = useState(false)
@@ -99,57 +60,7 @@ export default function Hero() {
           </button>
         </div>
 
-        {/* Telemetry Console Cards (Informational Only) */}
-        <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 w-full max-w-[90rem]">
-          {telemetryFeatures.map((item) => {
-            const Icon = item.icon
-            return (
-              <div
-                key={item.label}
-                className="group relative flex flex-col justify-between p-4 rounded-xl border border-slate-700/60 bg-slate-900/80 backdrop-blur-xl transition-all duration-300 cursor-default overflow-hidden"
-              >
-                {/* Top Subtle Accent Light */}
-                <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent" />
 
-                {/* Top Meta Line */}
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-[11px] font-bold text-emerald-400 tracking-wider">
-                      {item.index}
-                    </span>
-                    <span className="text-[9px] font-mono font-medium text-slate-400 tracking-widest uppercase border-l border-slate-700/70 pl-2">
-                      {item.category}
-                    </span>
-                  </div>
-                  <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center text-emerald-400">
-                    <Icon className="w-3.5 h-3.5" />
-                  </div>
-                </div>
-
-                {/* Main Content */}
-                <div className="mb-3">
-                  <h3 className="text-base font-bold text-white tracking-tight">
-                    {item.label}
-                  </h3>
-                  <div className="text-xs font-mono font-medium text-slate-300 mt-1">
-                    {item.metric}
-                  </div>
-                </div>
-
-                {/* Footer Status Bar */}
-                <div className="flex items-center justify-between pt-2.5 border-t border-slate-800/80 mt-auto">
-                  <div className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_6px_rgba(52,211,153,0.9)]" />
-                    <span className="text-[10px] font-mono text-slate-400 tracking-wide">
-                      {item.status}
-                    </span>
-                  </div>
-                  <span className="text-[9px] font-mono text-slate-500 uppercase">INFO</span>
-                </div>
-              </div>
-            )
-          })}
-        </div>
 
       </div>
     </div>

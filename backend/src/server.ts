@@ -20,6 +20,7 @@ import analyticsRouter from './routes/analytics.js';
 import dataSourcesRouter from './routes/dataSources.js';
 import aiRouter from './routes/ai.js';
 import blockchainRouter from './routes/blockchain.js';
+import analysisReportsRouter from './routes/analysisReports.js';
 
 const app = express();
 
@@ -74,6 +75,7 @@ app.use('/api/analytics', analyticsRouter);
 app.use('/api/data-sources', dataSourcesRouter);
 app.use('/api/ai', aiRouter);
 app.use('/api/blockchain', blockchainRouter);
+app.use('/api/analysis-reports', analysisReportsRouter);
 
 // ── API index ────────────────────────────────────────────
 app.get('/api', (_req, res) => {

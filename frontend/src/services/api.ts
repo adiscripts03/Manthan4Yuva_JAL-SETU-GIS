@@ -109,12 +109,21 @@ export const updateIntervention = (id: string, updates: Record<string, unknown>)
 // ─── Analytics ───────────────────────────────────────────
 export const getAnalyticsSummary = () => fetchJSON('/analytics/summary');
 
+// ─── Analysis Reports ────────────────────────────────────
+export const getAnalysisReports = () => fetchJSON('/analysis-reports');
+export const createAnalysisReport = (report: unknown) =>
+  fetchJSON('/analysis-reports', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(report),
+  });
+
 // ─── Data Sources ────────────────────────────────────────
 export const getDataSources = () => fetchJSON('/data-sources');
 
 // ─── Blockchain ──────────────────────────────────────────
 export const getBlockchainStatus = () => fetchJSON('/blockchain/status');
 
-/** collection: 'citizen-reports' | 'interventions' */
-export const verifyOnChain = (collection: 'citizen-reports' | 'interventions', id: string) =>
+/** collection: 'citizen-reports' | 'interventions' | 'analysis-reports' */
+export const verifyOnChain = (collection: 'citizen-reports' | 'interventions' | 'analysis-reports', id: string) =>
   fetchJSON(`/blockchain/verify/${collection}/${id}`);

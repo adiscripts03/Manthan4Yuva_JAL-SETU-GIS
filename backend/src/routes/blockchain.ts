@@ -27,7 +27,7 @@ const COLLECTIONS: Record<string, { name: string; fields: (doc: any) => Record<s
       photo_url: doc.photo_url,
     }),
   },
-  interventions: {
+    interventions: {
     name: 'interventions',
     fields: (doc) => ({
       work_order_id: doc.work_order_id,
@@ -35,6 +35,21 @@ const COLLECTIONS: Record<string, { name: string; fields: (doc: any) => Record<s
       type: doc.type,
       description: doc.description,
       cost_estimate: doc.cost_estimate,
+    }),
+  },
+  'analysis-reports': {
+    name: 'analysis_reports',
+    fields: (doc) => ({
+      ward: doc.ward,
+      startDate: doc.startDate,
+      endDate: doc.endDate,
+      rainfall: doc.rainfall,
+      drain_coverage: doc.drain_coverage,
+      events: doc.events,
+      hotspots: doc.hotspots,
+      waterways: doc.waterways,
+      coverage: doc.coverage,
+      flood_affected_locations: doc.flood_affected_locations,
     }),
   },
 };
