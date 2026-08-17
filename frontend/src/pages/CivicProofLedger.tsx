@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import Sidebar from '../components/Sidebar';
-import { getInterventions, getGovernmentResponse, getCitizenReports } from '../services/api';
+import { getInterventions, getGovernmentResponse, getCitizenReports, getBlockchainStatus, verifyOnChain } from '../services/api';
 import { ShieldCheck, Copy, Check, ExternalLink, Activity, Layers } from 'lucide-react';
 
 export default function CivicProofLedger() {
@@ -11,18 +11,26 @@ export default function CivicProofLedger() {
   const [citizenReports, setCitizenReports] = useState<any[]>([]);
   const [selectedIntervention, setSelectedIntervention] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [chainStatus, setChainStatus] = useState<any>({ enabled: false, total_proofs_on_chain: null });
+  const [verifyResult, setVerifyResult] = useState<any>(null);
+
+  useEffect(() => {
+    setVerifyResult(null);
+  }, [selectedIntervention]);
 
   useEffect(() => {
     async function loadData() {
       try {
-        const [intRes, govRes, crRes] = await Promise.all([
+        const [intRes, govRes, crRes, chainRes] = await Promise.all([
           getInterventions(),
           getGovernmentResponse(),
           getCitizenReports({ limit: 20 }),
+          getBlockchainStatus().catch(() => ({ data: { enabled: false } })),
         ]);
         setInterventions(intRes.data || []);
         setGovResponse(govRes.data || null);
         setCitizenReports(crRes.data || []);
+        setChainStatus(chainRes.data || { enabled: false });
         if (intRes.data?.length > 0) setSelectedIntervention(intRes.data[0]);
       } catch (e) {
         console.error('Failed to load civic ledger data:', e);
@@ -39,9 +47,18 @@ export default function CivicProofLedger() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleVerify = () => {
+  const handleVerify = async () => {
+    if (!selectedIntervention?._id) return;
     setVerifying(true);
-    setTimeout(() => setVerifying(false), 1500);
+    setVerifyResult(null);
+    try {
+      const res = await verifyOnChain('interventions', selectedIntervention._id);
+      setVerifyResult(res.data);
+    } catch (err: any) {
+      setVerifyResult({ onChain: false, error: err.message || 'Verification failed' });
+    } finally {
+      setVerifying(false);
+    }
   };
 
   const totalSpending = govResponse?.total_spending_crore ? `₹${govResponse.total_spending_crore} Cr` : '—';
@@ -152,18 +169,18 @@ export default function CivicProofLedger() {
                 <div className="bg-[var(--bg-app)] p-4 rounded-xl border border-[var(--border-subtle)] mb-6">
                   <span className="block text-[10px] font-bold text-[var(--text-muted)] mb-2 uppercase tracking-widest">Immutable Ledger Hash Record</span>
                   <div className="flex items-center justify-between gap-4 font-mono text-xs text-[var(--color-primary)] font-semibold break-all p-3 bg-[var(--bg-surface)] rounded-lg border border-[var(--border-subtle)] select-all">
-                    <code>{selectedIntervention ? `0x${selectedIntervention._id || 'pending'}` : '0x_awaiting_intervention_data'}</code>
-                    <button onClick={() => handleCopy(selectedIntervention?._id || '')} className="text-[var(--text-muted)] hover:text-[var(--color-primary)] transition-colors shrink-0">
+                    <code>{selectedIntervention?.blockchain?.data_hash || (selectedIntervention ? `0x_pending_verification_${selectedIntervention._id}` : '0x_awaiting_intervention_data')}</code>
+                    <button onClick={() => handleCopy(selectedIntervention?.blockchain?.data_hash || selectedIntervention?._id || '')} className="text-[var(--text-muted)] hover:text-[var(--color-primary)] transition-colors shrink-0">
                       {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
                     </button>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-6 mb-6">
                   <div>
-                    <span className="block text-[10px] font-bold text-[var(--text-muted)] mb-1 uppercase tracking-widest">Total Interventions</span>
+                    <span className="block text-[10px] font-bold text-[var(--text-muted)] mb-1 uppercase tracking-widest">Records On-Chain</span>
                     <span className="text-xs font-mono text-[var(--text-primary)] flex items-center gap-2">
                       <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-natural-green)] animate-pulse"></span>
-                      {interventions.length} records
+                      {chainStatus.total_proofs_on_chain ?? interventions.length} records
                     </span>
                   </div>
                   <div>
@@ -171,13 +188,47 @@ export default function CivicProofLedger() {
                     <span className="text-xs font-mono text-[var(--color-primary)]">{citizenReports.length} submitted</span>
                   </div>
                 </div>
-                <button onClick={handleVerify} disabled={verifying} className="w-full flex items-center justify-center gap-2 px-6 py-3.5 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-white transition-all text-xs font-bold rounded-xl uppercase tracking-wider shadow-sm">
+                {!chainStatus.enabled && (
+                  <div className="text-xs text-amber-500 bg-amber-500/10 p-2 rounded mb-4 border border-amber-500/20 text-center">
+                    Blockchain verification is currently disabled or unavailable.
+                  </div>
+                )}
+                
+                {verifyResult && (
+                  <div className={`text-xs p-3 rounded-lg mb-4 border ${
+                    verifyResult.onChain && verifyResult.matches
+                      ? 'bg-[var(--color-soft-green)] text-[var(--color-natural-green)] border-[var(--color-natural-green)]/30'
+                      : 'bg-red-500/10 text-red-500 border-red-500/30'
+                  }`}>
+                    {verifyResult.onChain === false ? (
+                      <p>Verification failed: {verifyResult.error}</p>
+                    ) : verifyResult.matches === true ? (
+                      <div>
+                        <p className="font-bold flex items-center gap-1 mb-1"><Check className="w-4 h-4" /> Verified — on-chain hash matches</p>
+                        <p className="font-mono text-[10px] break-all opacity-80">On-Chain: {verifyResult.onChainHash}</p>
+                      </div>
+                    ) : (
+                      <div>
+                        <p className="font-bold">⚠️ Warning: Data Tampering Detected</p>
+                        <p>The current record does not match the on-chain proof.</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <button onClick={handleVerify} disabled={verifying || !chainStatus.enabled} className="w-full flex items-center justify-center gap-2 px-6 py-3.5 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-white transition-all text-xs font-bold rounded-xl uppercase tracking-wider shadow-sm disabled:opacity-50">
                   {verifying ? (
                     <span className="flex items-center gap-2"><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span> Verifying Hash...</span>
                   ) : (
-                    <><span>Inspect on Blockchain Explorer</span><ExternalLink className="w-4 h-4" /></>
+                    <><span>Verify Record Hash On-Chain</span><ShieldCheck className="w-4 h-4" /></>
                   )}
                 </button>
+
+                {selectedIntervention?.blockchain?.explorer_url && (
+                  <a href={selectedIntervention.blockchain.explorer_url} target="_blank" rel="noreferrer" className="mt-3 w-full flex items-center justify-center gap-2 px-6 py-2.5 bg-transparent hover:bg-[var(--bg-app)] border border-[var(--border-subtle)] text-[var(--text-primary)] transition-all text-xs font-bold rounded-xl uppercase tracking-wider shadow-sm hover:opacity-80">
+                    <span>Inspect on Blockchain Explorer</span><ExternalLink className="w-4 h-4" />
+                  </a>
+                )}
               </div>
             </div>
           </div>

@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { ObjectId } from 'mongodb';
 import { getDB } from '../db/connection.js';
 import { validateIntervention } from '../utils/validation.js';
+import { recordProof } from '../services/blockchain.js';
 
 const router = Router();
 
@@ -69,12 +70,41 @@ router.post('/', async (req: Request, res: Response) => {
     };
 
     const result = await db.collection('interventions').insertOne(intervention);
+    const recordId = result.insertedId.toString();
+
+    const proofResult = await recordProof('intervention', recordId, {
+      work_order_id: intervention.work_order_id,
+      waterway_osm_id: intervention.waterway_osm_id,
+      type: intervention.type,
+      description: intervention.description,
+      cost_estimate: intervention.cost_estimate,
+    });
+
+    const blockchain = proofResult.success
+      ? {
+          status: 'confirmed' as const,
+          tx_hash: proofResult.txHash,
+          data_hash: proofResult.dataHash,
+          explorer_url: proofResult.explorerUrl,
+        }
+      : {
+          status: 'unavailable' as const,
+          error: proofResult.error,
+        };
+
+    if (proofResult.success) {
+      await db.collection('interventions').updateOne(
+        { _id: result.insertedId },
+        { $set: { blockchain } }
+      );
+    }
 
     res.status(201).json({
       success: true,
       data: {
         _id: result.insertedId,
         ...intervention,
+        blockchain,
       },
     });
   } catch (error) {

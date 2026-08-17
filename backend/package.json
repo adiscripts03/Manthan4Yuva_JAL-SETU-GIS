@@ -31,9 +31,11 @@
     "@types/nodemailer": "^8.0.1",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
+    "ethers": "^6.17.0",
     "express": "^5.2.1",
     "mongodb": "^7.5.0",
-    "nodemailer": "^9.0.5"
+    "nodemailer": "^9.0.5",
+    "solc": "^0.8.24"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",

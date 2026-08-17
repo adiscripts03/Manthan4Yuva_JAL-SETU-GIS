@@ -19,6 +19,7 @@ import interventionsRouter from './routes/interventions.js';
 import analyticsRouter from './routes/analytics.js';
 import dataSourcesRouter from './routes/dataSources.js';
 import aiRouter from './routes/ai.js';
+import blockchainRouter from './routes/blockchain.js';
 
 const app = express();
 
@@ -72,6 +73,7 @@ app.use('/api/interventions', interventionsRouter);
 app.use('/api/analytics', analyticsRouter);
 app.use('/api/data-sources', dataSourcesRouter);
 app.use('/api/ai', aiRouter);
+app.use('/api/blockchain', blockchainRouter);
 
 // ── API index ────────────────────────────────────────────
 app.get('/api', (_req, res) => {
@@ -103,6 +105,8 @@ app.get('/api', (_req, res) => {
       analytics_summary: 'GET /api/analytics/summary',
       data_sources: 'GET /api/data-sources',
       ai_agent: 'POST /api/ai/agent',
+      blockchain_status: 'GET /api/blockchain/status',
+      blockchain_verify: 'GET /api/blockchain/verify/:collection/:id',
     },
   });
 });

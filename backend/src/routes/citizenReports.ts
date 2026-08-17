@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { getDB } from '../db/connection.js';
 import { parseBbox, bboxToMongoFilter, validateCitizenReport } from '../utils/validation.js';
+import { recordProof } from '../services/blockchain.js';
 
 const router = Router();
 
@@ -45,12 +46,41 @@ router.post('/', async (req: Request, res: Response) => {
     };
 
     const result = await db.collection('citizen_reports').insertOne(report);
+    const recordId = result.insertedId.toString();
+
+    const proofResult = await recordProof('citizen_report', recordId, {
+      location: report.location,
+      timestamp: report.timestamp,
+      estimated_depth: report.estimated_depth,
+      description: report.description,
+      photo_url: report.photo_url,
+    });
+
+    const blockchain = proofResult.success
+      ? {
+          status: 'confirmed' as const,
+          tx_hash: proofResult.txHash,
+          data_hash: proofResult.dataHash,
+          explorer_url: proofResult.explorerUrl,
+        }
+      : {
+          status: 'unavailable' as const,
+          error: proofResult.error,
+        };
+
+    if (proofResult.success) {
+      await db.collection('citizen_reports').updateOne(
+        { _id: result.insertedId },
+        { $set: { blockchain } }
+      );
+    }
 
     res.status(201).json({
       success: true,
       data: {
         _id: result.insertedId,
         ...report,
+        blockchain,
       },
       meta: {
         message: 'Citizen report submitted successfully',

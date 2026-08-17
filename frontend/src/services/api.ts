@@ -111,3 +111,10 @@ export const getAnalyticsSummary = () => fetchJSON('/analytics/summary');
 
 // ─── Data Sources ────────────────────────────────────────
 export const getDataSources = () => fetchJSON('/data-sources');
+
+// ─── Blockchain ──────────────────────────────────────────
+export const getBlockchainStatus = () => fetchJSON('/blockchain/status');
+
+/** collection: 'citizen-reports' | 'interventions' */
+export const verifyOnChain = (collection: 'citizen-reports' | 'interventions', id: string) =>
+  fetchJSON(`/blockchain/verify/${collection}/${id}`);
