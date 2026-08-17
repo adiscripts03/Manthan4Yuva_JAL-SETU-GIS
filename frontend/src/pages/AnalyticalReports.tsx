@@ -8,7 +8,6 @@ import {
   getWards,
 } from '../services/api';
 import { FileText, Cpu, Printer, Calendar, MapPin, Layers, AlertCircle, CheckCircle } from 'lucide-react';
-import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 
 // ─── Types ────────────────────────────────────────────────
@@ -268,88 +267,354 @@ export default function AnalyticalReports() {
     setGenerating(false);
   }
 
-  // ─── oklch → rgb resolver ─────────────────────────────
-  // html2canvas does not understand oklch() (Tailwind v4 default color space).
-  // We resolve every oklch value to an sRGB hex by letting the browser paint it
-  // into a tiny off-screen canvas and reading back the pixel.
-  function resolveColor(value: string): string {
-    if (!value.includes('oklch')) return value;
-    try {
-      const offscreen = document.createElement('canvas');
-      offscreen.width = 1;
-      offscreen.height = 1;
-      const ctx = offscreen.getContext('2d');
-      if (!ctx) return value;
-      ctx.fillStyle = value;
-      ctx.fillRect(0, 0, 1, 1);
-      const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
-      return `rgb(${r},${g},${b})`;
-    } catch {
-      return value;
-    }
-  }
-
-  // Walk every element in a DOM tree and inline its computed color/background
-  // properties as plain rgb() so html2canvas never sees oklch().
-  function resolveOklchInClone(root: HTMLElement) {
-    const COLOR_PROPS = [
-      'color', 'backgroundColor', 'borderColor',
-      'borderTopColor', 'borderRightColor', 'borderBottomColor', 'borderLeftColor',
-      'outlineColor', 'fill', 'stroke',
-    ] as const;
-
-    const walk = (el: Element) => {
-      if (!(el instanceof HTMLElement)) return;
-      const computed = window.getComputedStyle(el);
-      for (const prop of COLOR_PROPS) {
-        const val = computed[prop as keyof CSSStyleDeclaration] as string;
-        if (val && val.includes('oklch')) {
-          el.style[prop as any] = resolveColor(val);
-        }
-      }
-      for (const child of Array.from(el.children)) walk(child);
-    };
-
-    walk(root);
-  }
-
-  // ─── Action: Export PDF ──────────────────────────────
+  // ─── Action: Export PDF (proper formatted document) ──
   async function handleExportPDF() {
-    if (!reportData || !reportRef.current) {
+    if (!reportData || !reportConfig) {
       showToast('error', 'Run analysis first to generate a report before exporting.');
       return;
     }
     setExporting(true);
     try {
-      const canvas = await html2canvas(reportRef.current, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: '#ffffff',
-        logging: false,
-        onclone: (_doc: Document, el: HTMLElement) => {
-          // Force all oklch computed colors to rgb in the cloned subtree
-          resolveOklchInClone(el);
-        },
-      });
-      const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-      const pdfW = pdf.internal.pageSize.getWidth();
-      const pdfH = (canvas.height * pdfW) / canvas.width;
-      // If content is taller than one A4 page, tile across multiple pages
-      if (pdfH > pdf.internal.pageSize.getHeight()) {
-        const pageHeight = pdf.internal.pageSize.getHeight();
-        let yOffset = 0;
-        while (yOffset < pdfH) {
-          if (yOffset > 0) pdf.addPage();
-          pdf.addImage(imgData, 'PNG', 0, -yOffset, pdfW, pdfH);
-          yOffset += pageHeight;
+      const W = pdf.internal.pageSize.getWidth();   // 210 mm
+      const H = pdf.internal.pageSize.getHeight();  // 297 mm
+      const ML = 18; // margin left
+      const MR = W - 18; // margin right
+      const TW = MR - ML; // text width
+      let y = 0;
+
+      const ward_label = KNOWN_WARDS.find((w) => w.id === reportConfig.ward)?.label ?? reportConfig.ward;
+      const actionPlan = buildActionPlan(reportData, reportConfig.overlays);
+
+      // ── colour palette (all hex, no oklch) ───────────────
+      const C_BRAND   = '#176B87' as const;
+      const C_DARK    = '#0E1B24' as const;
+      const C_MID     = '#475569' as const;
+      const C_LIGHT   = '#64748B' as const;
+      const C_RULE    = '#E2E8F0' as const;
+      const C_BG_HDR  = '#E8F3F5' as const;
+      const C_BG_STAT = '#F7F9F7' as const;
+      const C_GREEN   = '#3A8F6B' as const;
+      const C_WHITE   = '#FFFFFF' as const;
+      const C_RED     = '#DC2626' as const;
+      const C_AMBER   = '#D97706' as const;
+
+      // ── helpers ──────────────────────────────────────────
+      const setFont = (style: 'normal'|'bold'|'italic', size: number, color = C_DARK) => {
+        pdf.setFont('helvetica', style);
+        pdf.setFontSize(size);
+        pdf.setTextColor(color);
+      };
+      const rule = (yy: number, color = C_RULE) => {
+        pdf.setDrawColor(color);
+        pdf.setLineWidth(0.3);
+        pdf.line(ML, yy, MR, yy);
+      };
+      const rect = (x: number, yy: number, w: number, h: number, fill: string) => {
+        pdf.setFillColor(fill);
+        pdf.rect(x, yy, w, h, 'F');
+      };
+      const newPageIfNeeded = (needed: number) => {
+        if (y + needed > H - 18) {
+          pdf.addPage();
+          y = 18;
         }
+      };
+
+      // ══════════════════════════════════════════════════════
+      // PAGE 1 — COVER BAND + OVERVIEW
+      // ══════════════════════════════════════════════════════
+
+      // ── Full-width brand header band ─────────────────────
+      rect(0, 0, W, 36, C_BRAND);
+      setFont('bold', 20, C_WHITE);
+      pdf.text('JAL SETU GIS', ML, 14);
+      setFont('normal', 8, C_BG_HDR);
+      pdf.text('HYDRAULIC INTELLIGENCE PLATFORM  ·  NAGPUR MUNICIPAL CORPORATION', ML, 20);
+      setFont('bold', 11, C_WHITE);
+      pdf.text('WATERLOGGING ANALYSIS REPORT', ML, 29);
+
+      // Stamp top-right
+      setFont('bold', 7, C_BG_HDR);
+      pdf.text('OFFICIAL ANALYSIS', MR - 2, 14, { align: 'right' });
+      setFont('normal', 7, C_BG_HDR);
+      pdf.text(`Generated: ${reportData.generatedAt}`, MR - 2, 19, { align: 'right' });
+      pdf.text(`City: ${reportData.cityName}`, MR - 2, 24, { align: 'right' });
+      pdf.text('Model: VNIT Frequency Ratio', MR - 2, 29, { align: 'right' });
+
+      y = 44;
+
+      // ── Report scope banner ──────────────────────────────
+      rect(ML, y, TW, 18, C_BG_HDR);
+      pdf.setDrawColor(C_BRAND);
+      pdf.setLineWidth(0.8);
+      pdf.line(ML, y, ML, y + 18);
+      pdf.setLineWidth(0.3);
+      setFont('bold', 8, C_BRAND);
+      pdf.text('REPORT SCOPE', ML + 3, y + 5);
+      setFont('normal', 8, C_DARK);
+      pdf.text(`Ward / Area :  ${ward_label}`, ML + 3, y + 10);
+      pdf.text(
+        `Temporal Scope :  ${reportConfig.startDate}  →  ${reportConfig.endDate}`,
+        ML + 3, y + 15
+      );
+      // Active overlays on the right
+      const activeOverlays = [
+        reportConfig.overlays.waterlogging ? 'Historical Waterlogging' : null,
+        reportConfig.overlays.drainage     ? 'Drainage Network Capacity' : null,
+        reportConfig.overlays.precipitation? 'Precipitation Anomalies'  : null,
+      ].filter(Boolean).join('  ·  ');
+      setFont('normal', 7, C_MID);
+      pdf.text(`Overlays: ${activeOverlays}`, MR - 2, y + 10, { align: 'right' });
+      y += 24;
+
+      // ── No-data short-circuit ─────────────────────────────
+      if (!reportData.hasData) {
+        newPageIfNeeded(40);
+        rect(ML, y, TW, 28, '#FEF3C7');
+        setFont('bold', 11, C_AMBER);
+        pdf.text('No Data Available for This Period', ML + 4, y + 10);
+        setFont('normal', 9, C_DARK);
+        pdf.text(
+          `No flood events or hotspot records were found for the selected ward and date range.`,
+          ML + 4, y + 17
+        );
+        setFont('normal', 8, C_MID);
+        pdf.text('Try widening the temporal scope or selecting a different ward.', ML + 4, y + 23);
+        y += 34;
       } else {
-        pdf.addImage(imgData, 'PNG', 0, 0, pdfW, pdfH);
+
+        // ── Section 1: Key Statistics ─────────────────────
+        setFont('bold', 9, C_BRAND);
+        pdf.text('01  KEY STATISTICS', ML, y);
+        rule(y + 2, C_BRAND);
+        y += 7;
+
+        // 4-column stat grid
+        const stats = [
+          { label: 'FLOOD EVENTS', value: String(reportData.events), sub: 'in period', color: C_BRAND },
+          { label: 'HOTSPOTS', value: String(reportData.hotspots), sub: 'in ward', color: C_BRAND },
+          { label: 'WATERWAYS', value: String(reportData.waterways),
+            sub: reportConfig.ward === 'all' ? 'city-wide' : 'est. in ward', color: C_BRAND },
+          { label: 'DRAIN COVERAGE', value: `${reportData.coverage}%`, sub: 'infra coverage', color: C_GREEN },
+        ];
+        const cellW = TW / 4;
+        stats.forEach((s, i) => {
+          const cx = ML + i * cellW;
+          rect(cx, y, cellW - 1, 22, C_BG_STAT);
+          pdf.setDrawColor(C_RULE);
+          pdf.setLineWidth(0.25);
+          pdf.rect(cx, y, cellW - 1, 22);
+          setFont('bold', 6, C_LIGHT);
+          pdf.text(s.label, cx + 2.5, y + 5.5);
+          setFont('bold', 16, s.color);
+          pdf.text(s.value, cx + 2.5, y + 15);
+          setFont('normal', 6, C_LIGHT);
+          pdf.text(s.sub, cx + 2.5, y + 20);
+        });
+        y += 28;
+
+        // Supplementary metrics row
+        const suppStats = [
+          { label: 'Annual Avg Rainfall', value: `${reportData.rainfall} mm/yr` },
+          { label: 'High-Risk Area (city)', value: reportData.highRiskPct ? `${reportData.highRiskPct.toFixed(1)}%` : '—' },
+          { label: 'Drain Infra Coverage', value: `${reportData.coverage}%` },
+        ];
+        suppStats.forEach((s, i) => {
+          const cx = ML + i * (TW / 3);
+          setFont('bold', 7, C_MID);
+          pdf.text(`${s.label}:`, cx, y);
+          setFont('bold', 8, C_DARK);
+          pdf.text(s.value, cx + 40, y);
+        });
+        y += 8;
+        rule(y);
+        y += 6;
+
+        // ── Section 2: Flood Locations Table ─────────────
+        if (reportData.priorityHotspots.length > 0) {
+          newPageIfNeeded(20 + reportData.priorityHotspots.length * 8);
+          setFont('bold', 9, C_BRAND);
+          pdf.text('02  FLOOD-AFFECTED LOCATIONS', ML, y);
+          rule(y + 2, C_BRAND);
+          y += 7;
+
+          // Table header
+          const cols = [
+            { label: 'LOCATION', x: ML,      w: 70 },
+            { label: 'CATEGORY', x: ML + 70, w: 55 },
+            { label: 'SOURCE EVENT', x: ML + 125, w: 65 },
+          ];
+          rect(ML, y, TW, 7, C_BRAND);
+          cols.forEach((c) => {
+            setFont('bold', 7, C_WHITE);
+            pdf.text(c.label, c.x + 2, y + 4.8);
+          });
+          y += 7;
+
+          reportData.priorityHotspots.forEach((loc: any, idx: number) => {
+            newPageIfNeeded(9);
+            const rowBg = idx % 2 === 0 ? C_WHITE : C_BG_STAT;
+            rect(ML, y, TW, 7.5, rowBg);
+            pdf.setDrawColor(C_RULE);
+            pdf.setLineWidth(0.2);
+            pdf.line(ML, y + 7.5, MR, y + 7.5);
+
+            setFont('bold', 8, C_DARK);
+            pdf.text(loc.name ?? '—', cols[0].x + 2, y + 5, { maxWidth: cols[0].w - 4 });
+            setFont('normal', 7.5, C_MID);
+            pdf.text(
+              (loc.category ?? '—').replace(/_/g, ' '),
+              cols[1].x + 2, y + 5,
+              { maxWidth: cols[1].w - 4 }
+            );
+            pdf.text(
+              loc.source_event ?? '—',
+              cols[2].x + 2, y + 5,
+              { maxWidth: cols[2].w - 4 }
+            );
+            y += 7.5;
+          });
+          y += 6;
+          rule(y);
+          y += 6;
+        }
+
+        // ── Section 3: Flood Events ───────────────────────
+        newPageIfNeeded(30);
+        setFont('bold', 9, C_BRAND);
+        pdf.text('03  HISTORICAL FLOOD EVENTS', ML, y);
+        rule(y + 2, C_BRAND);
+        y += 7;
+
+        const eventsInRange = allFloodEvents.filter((evt) => {
+          if (!evt.date) return false;
+          return evt.date.slice(0, 10) >= reportConfig.startDate &&
+                 evt.date.slice(0, 10) <= reportConfig.endDate;
+        });
+
+        if (eventsInRange.length === 0) {
+          setFont('normal', 8, C_LIGHT);
+          pdf.text('No flood events recorded in the selected date range.', ML, y);
+          y += 8;
+        } else {
+          eventsInRange.forEach((evt: any, idx: number) => {
+            newPageIfNeeded(28);
+            // Event header bar
+            rect(ML, y, TW, 7, C_BG_HDR);
+            setFont('bold', 8, C_BRAND);
+            pdf.text(`Event ${idx + 1}  ·  ${evt.date ?? '—'}`, ML + 2, y + 5);
+            if (evt.rainfall_mm) {
+              setFont('normal', 7, C_MID);
+              pdf.text(`Rainfall: ${evt.rainfall_mm} mm`, MR - 2, y + 5, { align: 'right' });
+            }
+            y += 9;
+
+            // Event detail rows
+            const rows: [string, string][] = [
+              ['Deaths',           evt.deaths != null ? String(evt.deaths) : '—'],
+              ['Evacuated',        evt.evacuated ?? '—'],
+              ['Houses Affected',  evt.houses_affected != null ? String(evt.houses_affected) : '—'],
+              ['Cause',            evt.cause ?? '—'],
+              ['Relief Announced', evt.relief_announced ?? '—'],
+            ];
+            rows.forEach(([k, v]) => {
+              newPageIfNeeded(7);
+              setFont('bold', 7, C_MID);
+              pdf.text(k, ML + 2, y);
+              setFont('normal', 7.5, C_DARK);
+              // wrap long values
+              const lines = pdf.splitTextToSize(v, TW - 36);
+              pdf.text(lines, ML + 36, y);
+              y += Math.max(5.5, lines.length * 4.5);
+            });
+            y += 4;
+            rule(y, C_RULE);
+            y += 5;
+          });
+        }
+
+        // ── Section 4: Flood Susceptibility ──────────────
+        const susceptibilityClasses = summary?.susceptibility?.classes ?? [];
+        if (susceptibilityClasses.length > 0) {
+          newPageIfNeeded(16 + susceptibilityClasses.length * 8);
+          setFont('bold', 9, C_BRAND);
+          pdf.text('04  FLOOD SUSCEPTIBILITY MODEL', ML, y);
+          rule(y + 2, C_BRAND);
+          y += 7;
+          setFont('normal', 8, C_MID);
+          pdf.text('VNIT Frequency Ratio Model  ·  Source: VNIT Nagpur Flood Susceptibility Study', ML, y);
+          y += 6;
+
+          // Bar chart rows
+          susceptibilityClasses.forEach((cls: any) => {
+            newPageIfNeeded(9);
+            const pct = parseFloat(cls.area_pct || '0');
+            const isHigh = String(cls.class || '').toLowerCase().includes('high');
+            setFont('bold', 7.5, isHigh ? C_RED : C_DARK);
+            pdf.text(cls.class ?? '—', ML, y + 3.5);
+            setFont('normal', 7.5, C_MID);
+            pdf.text(`${cls.area_pct}%`, ML + 45, y + 3.5);
+            // bar track
+            rect(ML + 55, y, TW - 55, 4.5, C_RULE);
+            // bar fill
+            rect(ML + 55, y, Math.max(1, ((TW - 55) * pct) / 100), 4.5, isHigh ? C_RED : C_BRAND);
+            y += 7;
+          });
+          y += 4;
+          rule(y);
+          y += 6;
+        }
+
+        // ── Section 5: Priority Interventions ────────────
+        if (actionPlan.length > 0) {
+          newPageIfNeeded(20 + actionPlan.length * 24);
+          setFont('bold', 9, C_BRAND);
+          pdf.text('05  PRIORITY INTERVENTIONS', ML, y);
+          rule(y + 2, C_BRAND);
+          y += 7;
+
+          actionPlan.forEach((action, idx) => {
+            newPageIfNeeded(26);
+            // Numbered badge
+            rect(ML, y, 8, 8, C_BRAND);
+            setFont('bold', 8, C_WHITE);
+            pdf.text(`0${idx + 1}`, ML + 1.5, y + 5.8);
+            // Title + metric
+            setFont('bold', 9, C_DARK);
+            pdf.text(action.title, ML + 11, y + 4);
+            setFont('bold', 7.5, C_BRAND);
+            pdf.text(action.metric, MR - 2, y + 4, { align: 'right' });
+            // Detail text
+            y += 9;
+            setFont('normal', 8, C_MID);
+            const lines = pdf.splitTextToSize(action.detail, TW - 11);
+            pdf.text(lines, ML + 11, y);
+            y += lines.length * 4.5 + 5;
+            rule(y, C_RULE);
+            y += 5;
+          });
+        }
+      } // end hasData block
+
+      // ══════════════════════════════════════════════════════
+      // FOOTER on every page
+      // ══════════════════════════════════════════════════════
+      const totalPages = (pdf as any).internal.getNumberOfPages();
+      for (let p = 1; p <= totalPages; p++) {
+        pdf.setPage(p);
+        rect(0, H - 10, W, 10, C_DARK);
+        setFont('normal', 6.5, C_MID);
+        pdf.text('JAL SETU URBAN INTELLIGENCE  ·  VNIT Frequency Ratio Model  ·  Data: OpenStreetMap / NMC Nagpur', ML, H - 4.5);
+        setFont('bold', 6.5, '#94A3B8');
+        pdf.text(`Page ${p} of ${totalPages}`, MR - 2, H - 4.5, { align: 'right' });
       }
-      const wardLabel = KNOWN_WARDS.find((w) => w.id === ward)?.label?.replace(/[^a-zA-Z0-9]/g, '-') ?? 'report';
-      pdf.save(`jal-setu-report-${wardLabel}-${startDate}.pdf`);
-      showToast('success', 'PDF exported successfully.');
+
+      // ── Save ──────────────────────────────────────────────
+      const wardSlug = KNOWN_WARDS.find((w) => w.id === reportConfig.ward)
+        ?.label?.replace(/[^a-zA-Z0-9]/g, '-') ?? 'report';
+      pdf.save(`jal-setu-report-${wardSlug}-${reportConfig.startDate}.pdf`);
+      showToast('success', 'PDF report exported successfully.');
     } catch (err) {
       showToast('error', `Export failed: ${(err as Error).message}`);
     } finally {
