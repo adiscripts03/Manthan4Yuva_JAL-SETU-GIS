@@ -56,16 +56,16 @@ export default function Hero() {
         <GeoTransition onComplete={() => setShowTransition(false)} />
       )}
 
-      {/* Real-world Hero Background (Drainage / Green Stream style) */}
-      <div
-        className="absolute inset-0 z-0 bg-cover bg-no-repeat pointer-events-none"
-        style={{
-          backgroundImage: `url('/irrigation_canal.png')`,
-          backgroundPosition: 'left 75%',
-          transform: 'scaleX(-1)',
-          filter: 'brightness(0.9) contrast(1.1) saturate(1.1)'
-        }}
-      />
+      {/* Hero Background Video */}
+      <video
+        autoPlay
+        loop
+        muted
+        playsInline
+        className="absolute inset-0 z-0 w-full h-full object-cover pointer-events-none filter brightness-90 contrast-105"
+      >
+        <source src="/textures/create_a_video_for_me_like_im.mp4" type="video/mp4" />
+      </video>
 
       {/* Professional institutional Gradient Overlay */}
       <div className="pointer-events-none absolute inset-0 z-[1] bg-gradient-to-r from-slate-950/90 via-slate-900/40 to-transparent" />
