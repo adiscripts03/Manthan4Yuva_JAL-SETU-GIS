@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, useLocation } from 'react-router-dom';
 import TopBar from './components/TopBar';
 import Hero from './components/Hero';
 import RainfallIntelligence from './pages/RainfallIntelligence';
@@ -10,7 +10,9 @@ import TopographyIntelligence from './pages/TopographyIntelligence';
 import MapSyncChatbot from './components/MapSyncChatbot';
 
 export default function App() {
+  const location = useLocation();
   const [globalSearch, setGlobalSearch] = useState('');
+  const isHomePage = location.pathname === '/';
 
   const handleGlobalSearch = (query: string) => {
     setGlobalSearch(query);
@@ -19,7 +21,7 @@ export default function App() {
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-[var(--bg-app)] text-[var(--text-primary)] transition-colors">
-      <TopBar onSearch={handleGlobalSearch} />
+      {!isHomePage && <TopBar onSearch={handleGlobalSearch} />}
       
       <div className="flex flex-1 overflow-hidden relative">
         <Routes>
@@ -36,7 +38,7 @@ export default function App() {
         </Routes>
       </div>
 
-      <MapSyncChatbot />
+      {!isHomePage && <MapSyncChatbot />}
     </div>
   );
 }
