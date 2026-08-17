@@ -110,7 +110,7 @@ export default function Hero() {
               >
                 {/* Top Subtle Accent Light */}
                 <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent" />
-                
+
                 {/* Top Meta Line */}
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">

@@ -4,32 +4,36 @@ import { getWaterways, getWaterwayStats, getNullahs, getWaterwayById } from '../
 import { MapContainer, TileLayer, Polyline, Tooltip, Marker } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import { Play, Pause, X, Layers, Plus, Minus, Compass, Search, Filter } from 'lucide-react';
 
-// Create a custom pulsing red icon for AI markers
 const aiIcon = new L.DivIcon({
   className: 'custom-ai-icon',
-  html: `<div class="w-4 h-4 bg-red-500 rounded-full animate-ping absolute opacity-75"></div><div class="w-4 h-4 bg-red-600 border-2 border-white rounded-full relative shadow-[0_0_15px_rgba(220,38,38,1)]"></div>`,
+  html: `<div class="w-4 h-4 bg-red-500 rounded-full animate-ping absolute opacity-75"></div><div class="w-4 h-4 bg-red-600 border-2 border-white rounded-full relative shadow-md"></div>`,
   iconSize: [16, 16],
   iconAnchor: [8, 8]
 });
 
 const WATERWAY_COLORS: Record<string, string> = {
-  river: '#059669', // Rich Forest River Green
-  stream: '#34d399', // Bright Natural Stream Mint
-  drain: '#10b981', // Emerald Drain
-  canal: '#f59e0b', // Warm Golden Amber
-  unknown: '#52525b'
+  river: '#0B3B60',
+  stream: '#1677FF',
+  drain: '#249B68',
+  canal: '#D97706',
+  unknown: '#64748B'
 };
 
 const WATERWAY_WEIGHTS: Record<string, number> = {
-  river: 6,
+  river: 5,
   stream: 3,
   drain: 3,
   canal: 4,
   unknown: 2
 };
 
-export default function DrainageNetwork() {
+interface DrainageNetworkProps {
+  searchFilter?: string;
+}
+
+export default function DrainageNetwork({ searchFilter = '' }: DrainageNetworkProps) {
   const [selectedAsset, setSelectedAsset] = useState<any>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -38,16 +42,32 @@ export default function DrainageNetwork() {
   const [nullahs, setNullahs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterType, setFilterType] = useState<string>('');
-  const [isLegendMinimized, setIsLegendMinimized] = useState(false);
-  const [isListMinimized, setIsListMinimized] = useState(false);
-  
-  // -- NEW: AI Data state --
+  const [localSearch, setLocalSearch] = useState<string>('');
+  const [isLegendExpanded, setIsLegendExpanded] = useState(false);
+  const [isListExpanded, setIsListExpanded] = useState(true);
   const [aiData, setAiData] = useState<any>(null);
+  const [map, setMap] = useState<any>(null);
+  const [isDarkMap, setIsDarkMap] = useState<boolean>(() => {
+    return document.documentElement.getAttribute('data-theme') === 'dark';
+  });
 
   useEffect(() => {
-    // Listen for AI orchestration data pushes
+    const handleThemeChange = (e: any) => {
+      setIsDarkMap(e.detail === 'dark');
+    };
+    const observer = new MutationObserver(() => {
+      setIsDarkMap(document.documentElement.getAttribute('data-theme') === 'dark');
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    window.addEventListener('theme_change', handleThemeChange);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('theme_change', handleThemeChange);
+    };
+  }, []);
+
+  useEffect(() => {
     const handleAiSync = (e: any) => {
-      console.log('Received AI Sync Data:', e.detail);
       setAiData(e.detail);
     };
     window.addEventListener('ai_map_sync', handleAiSync);
@@ -82,7 +102,7 @@ export default function DrainageNetwork() {
     if (isPlaying) {
       interval = setInterval(() => {
         setProgress((prev) => (prev >= 100 ? 0 : prev + 1));
-      }, 100);
+      }, 120);
     }
     return () => clearInterval(interval);
   }, [isPlaying]);
@@ -100,33 +120,41 @@ export default function DrainageNetwork() {
     }
   };
 
+  const currentSearchTerm = (localSearch || searchFilter || '').toLowerCase();
+  const filteredWaterways = waterways.filter((ww: any) => {
+    if (!currentSearchTerm) return true;
+    const nameStr = (ww.name || '').toLowerCase();
+    const idStr = String(ww.osm_id || '').toLowerCase();
+    return nameStr.includes(currentSearchTerm) || idStr.includes(currentSearchTerm);
+  });
+
   return (
-    <div className="bg-background text-on-surface h-screen w-screen overflow-hidden flex flex-col font-body-sm relative selection:bg-primary-container selection:text-on-primary-container">
+    <div className="h-full w-full relative flex flex-col font-sans overflow-hidden bg-[var(--bg-app)]">
       <Sidebar />
 
-      <main className="flex-1 relative md:ml-[260px] bg-background overflow-hidden" style={{ height: "100vh" }}>
-        
-        {/* Real Leaflet Map */}
+      <main className="flex-1 relative md:ml-[240px] h-full overflow-hidden">
+        {/* Real Leaflet Map Container */}
         <div className="absolute inset-0 z-0">
           <MapContainer 
             center={[21.1458, 79.0882]} 
             zoom={12} 
-            style={{ width: '100%', height: '100%', background: '#0a0c10' }}
+            style={{ width: '100%', height: '100%' }}
             zoomControl={false}
+            ref={setMap}
           >
             <TileLayer
+              key={isDarkMap ? 'dark-map' : 'light-map'}
               attribution='&copy; OpenStreetMap CartoDB'
-              url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+              url={isDarkMap 
+                ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" 
+                : "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"}
             />
             
-            {/* Render actual geoJSON coordinates for waterways */}
             {waterways.map((ww: any, idx: number) => {
               if (!ww.geometry || ww.geometry.type !== 'LineString') return null;
-              // GeoJSON provides [lng, lat], Leaflet Polyline expects [lat, lng]
               const positions = ww.geometry.coordinates.map((coord: [number, number]) => [coord[1], coord[0]]);
               const isSelected = selectedAsset && selectedAsset.osm_id === ww.osm_id;
               
-              // Highlight if matched by AI extraction string array
               let isAITarget = false;
               if (aiData && aiData.canals && ww.name) {
                  isAITarget = aiData.canals.some((aiCanal: string) => 
@@ -135,9 +163,9 @@ export default function DrainageNetwork() {
                  );
               }
               
-              const finalColor = isAITarget ? '#ff3366' : isSelected ? '#10b981' : (WATERWAY_COLORS[ww.waterway] || WATERWAY_COLORS.unknown);
+              const finalColor = isAITarget ? '#EF4444' : isSelected ? 'var(--color-primary)' : (WATERWAY_COLORS[ww.waterway] || WATERWAY_COLORS.unknown);
               const finalWeight = isAITarget ? 8 : isSelected ? 6 : (WATERWAY_WEIGHTS[ww.waterway] || 2);
-              const finalOpacity = isAITarget ? 1 : isSelected ? 1 : (aiData?.canals?.length ? 0.2 : 0.7); // Dim non-targets if AI active
+              const finalOpacity = isAITarget ? 1 : isSelected ? 1 : (aiData?.canals?.length ? 0.25 : 0.75);
 
               return (
                 <Polyline 
@@ -149,25 +177,24 @@ export default function DrainageNetwork() {
                   eventHandlers={{
                     click: () => handleSelectWaterway(ww)
                   }}
-                  className={isAITarget ? "drain-line ai-glow" : (isSelected ? "drain-line" : "")}
                 >
                   <Tooltip sticky>
-                    <span className="font-bold">{ww.name || 'Unnamed segment'}</span><br/>
-                    <span className="text-xs text-on-surface-variant font-data-mono">ID: {ww.osm_id}</span>
-                    {isAITarget && <div className="text-[#ff3366] font-bold text-[10px] mt-1 border-t border-[#ff3366]/30 pt-1">⚡️ AI Data Extracted</div>}
+                    <div className="text-xs font-sans">
+                      <strong className="font-semibold text-[var(--text-primary)]">{ww.name || 'Unnamed Waterway'}</strong><br/>
+                      <span className="text-[10px] text-[var(--text-secondary)] font-mono">ID: {ww.osm_id}</span>
+                      {isAITarget && <div className="text-red-500 font-bold text-[10px] mt-0.5">⚡ AI Target</div>}
+                    </div>
                   </Tooltip>
                 </Polyline>
               );
             })}
 
-            {/* Render AI Synthetic Markers */}
             {aiData?.synthetic_markers?.map((marker: any) => (
                <Marker key={marker.id} position={[marker.lat, marker.lng]} icon={aiIcon}>
-                 <Tooltip permanent direction="top" className="bg-slate-900 border border-slate-700 text-white shadow-xl">
-                   <div className="flex flex-col gap-1 p-1">
-                     <span className="text-red-400 font-bold text-xs">⚠️ AI INFERENCE PENDING</span>
-                     <span className="text-slate-300 text-[10px]">{marker.desc}</span>
-                     {aiData.rainfall?.length > 0 && <span className="text-blue-300 text-[10px]">Rainfall est: {aiData.rainfall[0]}mm</span>}
+                 <Tooltip permanent direction="top">
+                   <div className="p-1 text-xs">
+                     <span className="text-red-500 font-bold text-xs block">AI Inference Marker</span>
+                     <span className="text-slate-600 text-[10px]">{marker.desc}</span>
                    </div>
                  </Tooltip>
                </Marker>
@@ -175,116 +202,165 @@ export default function DrainageNetwork() {
           </MapContainer>
         </div>
 
-        <div className="absolute inset-0 p-margin-page pointer-events-none flex justify-between items-start z-10">
-          {/* Left: Legend Panel with real stats */}
-          <div className={`glass-panel rounded-lg p-panel-padding w-72 pointer-events-auto flex flex-col gap-stack-gap transition-all ${isLegendMinimized ? 'h-[52px] overflow-hidden' : 'max-h-[calc(100vh-100px)] overflow-y-auto'}`}>
-            <div className="flex justify-between items-center mb-2">
-              <h3 className="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider mb-0">Network Legend</h3>
-              <button onClick={() => setIsLegendMinimized(!isLegendMinimized)} className="text-on-surface-variant hover:text-primary transition-colors">
-                <span className="material-symbols-outlined text-[18px]">{isLegendMinimized ? 'expand_more' : 'expand_less'}</span>
-              </button>
-            </div>
-            
-            {!isLegendMinimized && (
-              <>
-                {waterwayStats && (
-                  <div className="mb-2">
-                    <div className="font-data-mono text-[11px] text-primary mb-2">Total: {waterwayStats.total} waterways</div>
-                    {Object.entries(waterwayStats.by_type || {}).map(([type, count]: [string, any]) => (
-                      <div key={type}
-                        className={`flex items-center justify-between cursor-pointer hover:bg-surface-variant/30 p-1 rounded transition-colors ${filterType === type ? 'bg-primary/10' : ''}`}
-                        onClick={() => setFilterType(filterType === type ? '' : type)}
-                      >
-                        <div className="flex items-center gap-unit">
-                          <div className="w-6 h-1.5 rounded-full" style={{ backgroundColor: WATERWAY_COLORS[type] || WATERWAY_COLORS.unknown }}></div>
-                          <span className="font-data-mono text-data-mono text-on-surface capitalize">{type}</span>
-                        </div>
-                        <span className="font-data-mono text-data-mono text-on-surface-variant text-[10px]">{count}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Named Nullahs */}
-                {nullahs.length > 0 && (
-                  <div className="border-t border-outline-variant/20 pt-2">
-                    <h4 className="font-label-caps text-[10px] text-on-surface-variant mb-2">NAMED NULLAHS ({nullahs.length})</h4>
-                    <div className="flex flex-col gap-1 max-h-40 overflow-y-auto custom-scrollbar">
-                      {nullahs.map((n: any, idx: number) => (
-                        <div key={idx} className="text-[11px] font-data-mono text-on-surface-variant hover:text-primary cursor-pointer transition-colors max-w-full truncate">
-                          {n.name || n.nullah_name || `Nullah #${idx + 1}`}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-
-          {/* Right: Waterway List + Details */}
-          <div className="flex flex-col gap-2 w-80 pointer-events-auto max-h-[calc(100vh-100px)] overflow-y-auto custom-scrollbar">
-            {/* Waterway list */}
-            <div className={`glass-panel rounded-lg p-panel-padding flex flex-col gap-2 transition-all ${isListMinimized ? 'h-[52px] overflow-hidden' : ''}`}>
-              <div className="flex justify-between items-center mb-1">
-                <h3 className="font-label-caps text-label-caps text-on-surface-variant mb-0">
-                  WATERWAYS {filterType ? `(${filterType})` : ''} — {waterways.length}
-                </h3>
-                <button onClick={() => setIsListMinimized(!isListMinimized)} className="text-on-surface-variant hover:text-primary transition-colors">
-                  <span className="material-symbols-outlined text-[18px]">{isListMinimized ? 'expand_more' : 'expand_less'}</span>
-                </button>
+        {/* Map Floating UI Overlays */}
+        <div className="absolute inset-0 p-4 pointer-events-none flex justify-between items-start z-10">
+          
+          {/* Top Left: Compact Expandable Network Legend */}
+          <div className="pointer-events-auto flex flex-col gap-2">
+            <div className="glass-panel rounded-xl p-3 w-64 shadow-md transition-all">
+              <div className="flex justify-between items-center cursor-pointer" onClick={() => setIsLegendExpanded(!isLegendExpanded)}>
+                <div className="flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-[var(--color-primary)]" />
+                  <span className="font-bold text-xs text-[var(--text-primary)]">Network Legend</span>
+                </div>
+                <span className="text-[10px] font-semibold text-[var(--text-secondary)] bg-[var(--bg-app)] px-2 py-0.5 rounded-full">
+                  {waterwayStats?.total || waterways.length} total
+                </span>
               </div>
-              {!isListMinimized && (
-                <div className={`flex flex-col gap-1 max-h-52 overflow-y-auto custom-scrollbar transition-opacity ${loading ? 'opacity-50' : ''}`}>
-                  {waterways.slice(0, 30).map((ww: any, idx: number) => (
-                    <div key={idx}
-                      onClick={() => handleSelectWaterway(ww)}
-                      className={`text-[11px] font-data-mono p-2 rounded cursor-pointer transition-colors ${selectedAsset?.osm_id === ww.osm_id ? 'bg-primary/10 text-primary border border-primary/30' : 'text-on-surface-variant hover:bg-surface-variant/30 hover:text-on-surface'}`}
+              
+              {isLegendExpanded && (
+                <div className="mt-3 pt-3 border-t border-[var(--border-subtle)] flex flex-col gap-1.5 animate-in fade-in duration-200">
+                  {waterwayStats && Object.entries(waterwayStats.by_type || {}).map(([type, count]: [string, any]) => (
+                    <div 
+                      key={type}
+                      onClick={() => setFilterType(filterType === type ? '' : type)}
+                      className={`flex items-center justify-between px-2 py-1 rounded text-xs cursor-pointer transition-colors ${
+                        filterType === type ? 'bg-[var(--color-soft-blue)] text-[var(--color-primary)] font-semibold' : 'hover:bg-[var(--bg-app)] text-[var(--text-secondary)]'
+                      }`}
                     >
-                      <div className="flex justify-between items-center w-full">
-                        <span className="truncate max-w-[150px]">{ww.name || ww.osm_id || `Segment ${idx + 1}`}</span>
-                        <span className="capitalize text-[9px] text-outline shrink-0">{ww.waterway}</span>
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-1.5 rounded-full" style={{ backgroundColor: WATERWAY_COLORS[type] || WATERWAY_COLORS.unknown }}></div>
+                        <span className="capitalize">{type}</span>
                       </div>
+                      <span className="font-mono text-[10px]">{count}</span>
                     </div>
                   ))}
+
+                  {nullahs.length > 0 && (
+                    <div className="mt-2 pt-2 border-t border-[var(--border-subtle)]">
+                      <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider block mb-1">
+                        Named Nullahs ({nullahs.length})
+                      </span>
+                      <div className="max-h-28 overflow-y-auto custom-scrollbar flex flex-col gap-1">
+                        {nullahs.map((n: any, idx: number) => (
+                          <span key={idx} className="text-[11px] text-[var(--text-secondary)] hover:text-[var(--color-primary)] cursor-pointer truncate">
+                            {n.name || n.nullah_name || `Nullah #${idx + 1}`}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Top Right: Waterways List & Details Panel */}
+          <div className="pointer-events-auto flex flex-col gap-3 w-80 max-h-[calc(100vh-140px)]">
+            {/* Waterway Search & Filter List Card */}
+            <div className="glass-panel rounded-xl p-3 shadow-md flex flex-col gap-2">
+              <div className="flex justify-between items-center cursor-pointer" onClick={() => setIsListExpanded(!isListExpanded)}>
+                <div className="flex items-center gap-2">
+                  <Filter className="w-4 h-4 text-[var(--color-primary)]" />
+                  <h3 className="font-bold text-xs text-[var(--text-primary)]">Waterways</h3>
+                </div>
+                <span className="text-[10px] font-mono text-[var(--text-muted)]">
+                  {filteredWaterways.length} listed
+                </span>
+              </div>
+
+              {/* Local Search Input */}
+              <div className="relative mt-1">
+                <Search className="w-3 h-3 absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
+                <input
+                  type="text"
+                  value={localSearch}
+                  onChange={(e) => setLocalSearch(e.target.value)}
+                  placeholder="Filter by name or ID..."
+                  className="w-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] pl-7 pr-2 py-1 rounded-md outline-none focus:border-[var(--color-primary)] transition-colors placeholder:text-[var(--text-muted)]"
+                />
+              </div>
+
+              {/* Category Filter Pills */}
+              <div className="flex items-center gap-1 overflow-x-auto pb-1 custom-scrollbar pt-1">
+                {['', 'river', 'stream', 'drain', 'canal'].map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => setFilterType(cat)}
+                    className={`px-2.5 py-1 rounded-full text-[10px] font-semibold whitespace-nowrap transition-colors ${
+                      filterType === cat 
+                        ? 'bg-[var(--color-primary)] text-white' 
+                        : 'bg-[var(--bg-app)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                    }`}
+                  >
+                    {cat === '' ? 'All' : cat.charAt(0).toUpperCase() + cat.slice(1)}
+                  </button>
+                ))}
+              </div>
+
+              {/* Waterways List */}
+              {isListExpanded && (
+                <div className={`max-h-48 overflow-y-auto custom-scrollbar flex flex-col gap-1 pt-1 transition-opacity ${loading ? 'opacity-50' : ''}`}>
+                  {filteredWaterways.slice(0, 35).map((ww: any, idx: number) => {
+                    const isSelected = selectedAsset?.osm_id === ww.osm_id;
+                    return (
+                      <div
+                        key={idx}
+                        onClick={() => handleSelectWaterway(ww)}
+                        className={`p-2 rounded-lg text-xs cursor-pointer transition-colors flex items-center justify-between ${
+                          isSelected 
+                            ? 'bg-[var(--color-soft-blue)] text-[var(--color-primary)] font-semibold border border-[var(--color-primary)]/30' 
+                            : 'hover:bg-[var(--bg-app)] text-[var(--text-secondary)]'
+                        }`}
+                      >
+                        <span className="truncate max-w-[170px]">{ww.name || ww.osm_id || `Segment ${idx + 1}`}</span>
+                        <span className="text-[10px] font-mono capitalize opacity-75">{ww.waterway}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
 
-            {/* Selected waterway details */}
+            {/* Selected Waterway Feature Card */}
             {selectedAsset && (
-              <div className="glass-panel rounded-lg flex flex-col overflow-hidden animate-in slide-in-from-right-8 duration-300">
-                <div className="p-panel-padding border-b border-outline-variant/30 bg-surface-container-low/50 flex justify-between items-start">
+              <div className="glass-panel rounded-xl p-4 shadow-lg flex flex-col gap-3 border-l-4 border-l-[var(--color-primary)] animate-in slide-in-from-right-4 duration-200">
+                <div className="flex justify-between items-start border-b border-[var(--border-subtle)] pb-2">
                   <div>
-                    <div className="flex items-center gap-unit mb-1">
-                      <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
-                      <span className="font-data-mono text-data-mono text-primary tracking-wider">SELECTED WATERWAY</span>
-                    </div>
-                    <h2 className="font-headline-md text-[18px] font-bold text-primary glow-text break-words line-clamp-2">{selectedAsset.name || selectedAsset.osm_id}</h2>
+                    <span className="text-[10px] font-bold text-[var(--color-primary)] uppercase tracking-wider block">
+                      Selected Feature
+                    </span>
+                    <h2 className="text-sm font-bold text-[var(--text-primary)] leading-tight mt-0.5">
+                      {selectedAsset.name || selectedAsset.osm_id}
+                    </h2>
                   </div>
-                  <button onClick={() => setSelectedAsset(null)} className="text-on-surface-variant hover:text-primary transition-colors shrink-0 ml-2">
-                    <span className="material-symbols-outlined text-[20px]">close</span>
+                  <button 
+                    onClick={() => setSelectedAsset(null)} 
+                    className="text-[var(--text-muted)] hover:text-[var(--text-primary)] p-1 rounded-md transition-colors"
+                  >
+                    <X className="w-4 h-4" />
                   </button>
                 </div>
-                <div className="p-panel-padding grid grid-cols-2 gap-stack-gap">
-                  <div className="bg-surface-variant/30 p-unit rounded border border-outline-variant/20">
-                    <p className="font-label-caps text-label-caps text-on-surface-variant mb-1">Type</p>
-                    <p className="font-data-mono text-data-mono text-on-surface capitalize">{selectedAsset.waterway}</p>
+
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="bg-[var(--bg-app)] p-2 rounded-lg border border-[var(--border-subtle)]">
+                    <span className="text-[10px] font-semibold text-[var(--text-muted)] uppercase block mb-0.5">Type</span>
+                    <span className="font-semibold text-[var(--text-primary)] capitalize">{selectedAsset.waterway || 'N/A'}</span>
                   </div>
-                  <div className="bg-surface-variant/30 p-unit rounded border border-outline-variant/20">
-                    <p className="font-label-caps text-label-caps text-on-surface-variant mb-1">OSM ID</p>
-                    <p className="font-data-mono text-data-mono text-primary text-[10px] break-all">{selectedAsset.osm_id}</p>
+                  <div className="bg-[var(--bg-app)] p-2 rounded-lg border border-[var(--border-subtle)]">
+                    <span className="text-[10px] font-semibold text-[var(--text-muted)] uppercase block mb-0.5">OSM ID</span>
+                    <span className="font-mono text-[10px] text-[var(--color-primary)]">{selectedAsset.osm_id}</span>
                   </div>
                   {selectedAsset.width && (
-                    <div className="bg-surface-variant/30 p-unit rounded border border-outline-variant/20">
-                      <p className="font-label-caps text-label-caps text-on-surface-variant mb-1">Width</p>
-                      <p className="font-data-mono text-data-mono text-on-surface">{selectedAsset.width}</p>
+                    <div className="bg-[var(--bg-app)] p-2 rounded-lg border border-[var(--border-subtle)]">
+                      <span className="text-[10px] font-semibold text-[var(--text-muted)] uppercase block mb-0.5">Width</span>
+                      <span className="font-medium text-[var(--text-primary)]">{selectedAsset.width}</span>
                     </div>
                   )}
                   {selectedAsset.intermittent && (
-                    <div className="bg-surface-variant/30 p-unit rounded border border-outline-variant/20">
-                      <p className="font-label-caps text-label-caps text-on-surface-variant mb-1">Intermittent</p>
-                      <p className="font-data-mono text-data-mono text-on-surface">{selectedAsset.intermittent}</p>
+                    <div className="bg-[var(--bg-app)] p-2 rounded-lg border border-[var(--border-subtle)]">
+                      <span className="text-[10px] font-semibold text-[var(--text-muted)] uppercase block mb-0.5">Intermittent</span>
+                      <span className="font-medium text-[var(--text-primary)]">{selectedAsset.intermittent}</span>
                     </div>
                   )}
                 </div>
@@ -293,26 +369,66 @@ export default function DrainageNetwork() {
           </div>
         </div>
 
-        {/* Bottom scrubber */}
-        <div className="absolute bottom-margin-page left-1/2 -translate-x-1/2 w-[60%] max-w-2xl glass-panel rounded-full px-panel-padding py-unit flex items-center gap-gutter pointer-events-auto z-10 shadow-2xl backdrop-blur-xl bg-surface-container/80">
-          <button onClick={() => setIsPlaying(!isPlaying)} className="text-primary hover:bg-primary/20 p-2 rounded-full transition-colors flex-shrink-0">
-            <span className="material-symbols-outlined text-[24px]" style={{ fontVariationSettings: "'FILL' 1" }}>
-              {isPlaying ? 'pause_circle' : 'play_circle'}
-            </span>
+        {/* Map Control Buttons Stack (Zoom In, Zoom Out, Center) */}
+        <div className="absolute right-4 bottom-24 z-20 flex flex-col gap-1.5 pointer-events-auto">
+          <button 
+            onClick={() => map?.zoomIn()} 
+            className="btn-control shadow-md" 
+            title="Zoom In"
+          >
+            <Plus className="w-4 h-4" />
           </button>
-          <div className="flex-1 relative h-6 flex items-center group cursor-pointer" onClick={(e) => {
-            const rect = e.currentTarget.getBoundingClientRect();
-            const val = ((e.clientX - rect.left) / rect.width) * 100;
-            setProgress(Math.max(0, Math.min(100, val)));
-          }}>
-            <div className="absolute w-full h-[2px] bg-outline-variant/50 rounded-full"></div>
-            <div className="absolute h-[2px] bg-primary rounded-full shadow-[0_0_8px_rgba(0,242,255,0.8)]" style={{ width: `${progress}%` }}></div>
-            <div className="absolute w-3 h-3 rounded-full bg-primary -ml-1.5 shadow-[0_0_10px_rgba(0,242,255,1)] group-hover:scale-125 transition-transform" style={{ left: `${progress}%` }}></div>
+          <button 
+            onClick={() => map?.zoomOut()} 
+            className="btn-control shadow-md" 
+            title="Zoom Out"
+          >
+            <Minus className="w-4 h-4" />
+          </button>
+          <button 
+            onClick={() => map?.flyTo([21.1458, 79.0882], 12)} 
+            className="btn-control shadow-md" 
+            title="Center Map on Nagpur"
+          >
+            <Compass className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Floating Simulation Timeline Controls */}
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-[90%] max-w-xl glass-panel rounded-xl p-3 flex items-center gap-3 z-20 shadow-xl pointer-events-auto border border-[var(--border-subtle)]">
+          <button 
+            onClick={() => setIsPlaying(!isPlaying)} 
+            className="w-9 h-9 rounded-lg bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-white flex items-center justify-center shadow-sm shrink-0 transition-colors"
+          >
+            {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 fill-current ml-0.5" />}
+          </button>
+
+          <div 
+            className="flex-1 relative h-4 flex items-center group cursor-pointer"
+            onClick={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect();
+              const val = ((e.clientX - rect.left) / rect.width) * 100;
+              setProgress(Math.max(0, Math.min(100, val)));
+            }}
+          >
+            <div className="w-full h-1.5 bg-[var(--border-subtle)] rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-[var(--color-primary)] rounded-full transition-all ease-linear"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            <div 
+              className="absolute w-3.5 h-3.5 rounded-full bg-[var(--bg-surface)] border-2 border-[var(--color-primary)] shadow-md group-hover:scale-125 transition-transform"
+              style={{ left: `calc(${progress}% - 7px)` }}
+            />
           </div>
-          <span className="font-data-mono text-data-mono text-on-surface flex-shrink-0 w-32 text-right">
-            Simulate: 24h
-            <span className="block text-[10px] text-primary">{Math.floor((progress / 100) * 24)}h : {Math.floor((progress % (100/24))/(100/24)*60).toString().padStart(2, '0')}m</span>
-          </span>
+
+          <div className="font-mono text-xs text-[var(--text-secondary)] shrink-0 w-28 text-right">
+            <span>24h Sim</span>
+            <span className="block text-[10px] text-[var(--color-primary)] font-bold">
+              {Math.floor((progress / 100) * 24)}h : {Math.floor((progress % (100/24))/(100/24)*60).toString().padStart(2, '0')}m
+            </span>
+          </div>
         </div>
       </main>
     </div>

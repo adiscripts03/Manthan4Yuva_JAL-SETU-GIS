@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import Sidebar from '../components/Sidebar';
 import { getInterventions, getGovernmentResponse, getCitizenReports } from '../services/api';
+import { ShieldCheck, Copy, Check, ExternalLink, Activity, Layers } from 'lucide-react';
 
 export default function CivicProofLedger() {
   const [copied, setCopied] = useState(false);
@@ -43,67 +44,68 @@ export default function CivicProofLedger() {
     setTimeout(() => setVerifying(false), 1500);
   };
 
-  // Government response data
   const totalSpending = govResponse?.total_spending_crore ? `₹${govResponse.total_spending_crore} Cr` : '—';
   const pumpingStations = govResponse?.pumping_stations_progress || {};
 
   return (
-    <div className="text-slate-200 min-h-screen flex flex-col font-sans bg-[#0a140d] relative overflow-hidden" 
-         style={{ backgroundImage: "radial-gradient(circle at 50% 0%, rgba(16, 185, 129, 0.08) 0%, transparent 70%)" }}>
+    <div className="bg-[var(--bg-app)] text-[var(--text-primary)] min-h-screen flex flex-col font-sans relative overflow-hidden transition-colors">
       
       <Sidebar />
 
-      <main className="flex-1 md:ml-[260px] p-6 relative overflow-y-auto h-screen custom-scrollbar">
+      <main className="flex-1 md:ml-[240px] p-6 relative overflow-y-auto h-[calc(100vh-56px)] custom-scrollbar bg-[var(--bg-app)] transition-colors">
         
-        <div className={`relative z-10 max-w-6xl mx-auto flex flex-col lg:flex-row gap-6 h-full pt-4 pb-12 transition-opacity ${loading ? 'opacity-50' : ''}`}>
+        <div className={`relative z-10 max-w-6xl mx-auto flex flex-col lg:flex-row gap-6 h-full pt-2 pb-12 transition-opacity ${loading ? 'opacity-50' : ''}`}>
           {/* Left Column */}
           <div className="flex-1 flex flex-col gap-6">
             
             <div>
-              <h1 className="text-3xl font-bold text-white mb-2">Immutable Protocol Ledger</h1>
-              <p className="text-slate-400 text-sm">
+              <h1 className="text-2xl font-bold text-[var(--text-primary)] flex items-center gap-2 mb-1">
+                <ShieldCheck className="w-6 h-6 text-[var(--color-natural-green)]" />
+                Immutable Protocol Ledger
+              </h1>
+              <p className="text-[var(--text-secondary)] text-xs">
                 Cryptographic verification of infrastructure interventions.
                 {govResponse ? ` Post-2023 flood response: ${totalSpending} allocated.` : ''}
               </p>
             </div>
 
             {/* Selected Intervention or Gov Response Overview */}
-            <div className="bg-[#111c14]/80 backdrop-blur-xl border border-emerald-900/40 p-6 rounded-2xl shadow-xl">
+            <div className="bg-[var(--bg-surface)] border border-[var(--border-subtle)] p-6 rounded-2xl shadow-sm transition-colors">
               {selectedIntervention ? (
                 <>
                   <div className="flex items-start justify-between mb-4">
                     <div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="material-symbols-outlined text-[16px] text-emerald-400" style={{ fontVariationSettings: "'FILL' 1" }}>flood</span>
-                        <span className="text-[10px] uppercase font-bold text-emerald-400 tracking-[0.15em]">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Activity className="w-4 h-4 text-[var(--color-natural-green)]" />
+                        <span className="text-[10px] uppercase font-bold text-[var(--color-natural-green)] tracking-wider">
                           {selectedIntervention.work_order_id || 'INTERVENTION'}
                         </span>
                       </div>
-                      <h2 className="text-xl font-bold text-slate-100">{selectedIntervention.description || 'Intervention Details'}</h2>
+                      <h2 className="text-lg font-bold text-[var(--text-primary)]">{selectedIntervention.description || 'Intervention Details'}</h2>
                     </div>
                     <span className={`px-3 py-1 rounded-full text-xs font-mono font-semibold tracking-wide ${
-                      selectedIntervention.status === 'completed' ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' :
-                      selectedIntervention.status === 'in_progress' ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30' :
-                      'bg-slate-700/50 text-slate-300 border border-slate-600/30'
+                      selectedIntervention.status === 'completed' ? 'bg-[var(--color-soft-green)] text-[var(--color-natural-green)] border border-[var(--color-natural-green)]/30' :
+                      selectedIntervention.status === 'in_progress' ? 'bg-amber-100 text-amber-800 border border-amber-300' :
+                      'bg-[var(--bg-app)] text-[var(--text-secondary)] border border-[var(--border-subtle)]'
                     }`}>
                       {(selectedIntervention.status || 'UNKNOWN').toUpperCase().replace('_', ' ')}
                     </span>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="bg-[#16251b]/60 p-3.5 border border-emerald-800/30 rounded-xl">
-                      <span className="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-widest">Type</span>
-                      <span className="text-sm font-mono text-slate-200 capitalize">{selectedIntervention.type}</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="bg-[var(--bg-app)] p-3 border border-[var(--border-subtle)] rounded-xl">
+                      <span className="block text-[10px] font-bold text-[var(--text-muted)] mb-1 uppercase tracking-widest">Type</span>
+                      <span className="text-xs font-mono text-[var(--text-primary)] capitalize">{selectedIntervention.type}</span>
                     </div>
                     {selectedIntervention.cost_estimate && (
-                      <div className="bg-[#16251b]/60 p-3.5 border border-emerald-800/30 rounded-xl">
-                        <span className="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-widest">Cost Estimate</span>
-                        <span className="text-sm font-mono text-slate-200">₹{selectedIntervention.cost_estimate.toLocaleString()}</span>
+                      <div className="bg-[var(--bg-app)] p-3 border border-[var(--border-subtle)] rounded-xl">
+                        <span className="block text-[10px] font-bold text-[var(--text-muted)] mb-1 uppercase tracking-widest">Cost Estimate</span>
+                        <span className="text-xs font-mono text-[var(--text-primary)]">₹{selectedIntervention.cost_estimate.toLocaleString()}</span>
                       </div>
                     )}
                     {selectedIntervention.waterway_osm_id && (
-                      <div className="bg-[#16251b]/60 p-3.5 border border-emerald-800/30 rounded-xl col-span-2">
-                        <span className="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-widest">Linked Waterway</span>
-                        <span className="text-sm font-mono text-emerald-300">{selectedIntervention.waterway_osm_id}</span>
+                      <div className="bg-[var(--bg-app)] p-3 border border-[var(--border-subtle)] rounded-xl col-span-2">
+                        <span className="block text-[10px] font-bold text-[var(--text-muted)] mb-1 uppercase tracking-widest">Linked Waterway</span>
+                        <span className="text-xs font-mono text-[var(--color-primary)]">{selectedIntervention.waterway_osm_id}</span>
                       </div>
                     )}
                   </div>
@@ -112,26 +114,26 @@ export default function CivicProofLedger() {
                 <>
                   <div className="flex items-start justify-between mb-4">
                     <div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="material-symbols-outlined text-[16px] text-emerald-400" style={{ fontVariationSettings: "'FILL' 1" }}>account_balance</span>
-                        <span className="text-[10px] uppercase font-bold text-emerald-400 tracking-[0.15em]">GOVERNMENT RESPONSE</span>
+                      <div className="flex items-center gap-2 mb-1">
+                        <Layers className="w-4 h-4 text-[var(--color-primary)]" />
+                        <span className="text-[10px] uppercase font-bold text-[var(--color-primary)] tracking-wider">GOVERNMENT RESPONSE</span>
                       </div>
-                      <h2 className="text-xl font-bold text-slate-100">Post-2023 Flood Response</h2>
+                      <h2 className="text-lg font-bold text-[var(--text-primary)]">Post-2023 Flood Response</h2>
                     </div>
-                    <span className="bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-3 py-1 rounded-full text-xs font-mono font-semibold">{totalSpending}</span>
+                    <span className="bg-[var(--color-soft-blue)] text-[var(--color-primary)] border border-[var(--color-primary)]/30 px-3 py-1 rounded-full text-xs font-mono font-semibold">{totalSpending}</span>
                   </div>
                   {govResponse && (
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 gap-3">
                       {pumpingStations.constructed !== undefined && (
-                        <div className="bg-[#16251b]/60 p-3.5 border border-emerald-800/30 rounded-xl">
-                          <span className="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-widest">Pump Stations Built</span>
-                          <span className="text-sm font-mono text-emerald-300">{pumpingStations.constructed}</span>
+                        <div className="bg-[var(--bg-app)] p-3 border border-[var(--border-subtle)] rounded-xl">
+                          <span className="block text-[10px] font-bold text-[var(--text-muted)] mb-1 uppercase tracking-widest">Pump Stations Built</span>
+                          <span className="text-xs font-mono text-[var(--color-natural-green)]">{pumpingStations.constructed}</span>
                         </div>
                       )}
                       {pumpingStations.planned !== undefined && (
-                        <div className="bg-[#16251b]/60 p-3.5 border border-emerald-800/30 rounded-xl">
-                          <span className="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-widest">Planned</span>
-                          <span className="text-sm font-mono text-slate-200">{pumpingStations.planned}</span>
+                        <div className="bg-[var(--bg-app)] p-3 border border-[var(--border-subtle)] rounded-xl">
+                          <span className="block text-[10px] font-bold text-[var(--text-muted)] mb-1 uppercase tracking-widest">Planned</span>
+                          <span className="text-xs font-mono text-[var(--text-primary)]">{pumpingStations.planned}</span>
                         </div>
                       )}
                     </div>
@@ -141,40 +143,39 @@ export default function CivicProofLedger() {
             </div>
 
             {/* Blockchain Proof */}
-            <div className="bg-[#111c14]/80 backdrop-blur-xl p-6 rounded-2xl flex-1 flex flex-col border border-emerald-900/40 shadow-[0_0_30px_rgba(16,185,129,0.08)] relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
-              <div className="flex items-center gap-3 mb-6 border-b border-emerald-900/30 pb-4">
-                <span className="material-symbols-outlined text-[24px] text-emerald-400" style={{ fontVariationSettings: "'FILL' 1" }}>verified</span>
-                <h3 className="text-lg font-bold text-white">Consensus & Cryptographic Proof</h3>
+            <div className="bg-[var(--bg-surface)] p-6 rounded-2xl flex-1 flex flex-col border border-[var(--border-subtle)] shadow-sm relative overflow-hidden text-[var(--text-primary)] transition-colors">
+              <div className="flex items-center gap-3 mb-6 border-b border-[var(--border-subtle)] pb-4">
+                <ShieldCheck className="w-5 h-5 text-[var(--color-natural-green)]" />
+                <h3 className="text-base font-bold text-[var(--text-primary)]">Consensus & Cryptographic Proof</h3>
               </div>
               <div className="flex-1 flex flex-col justify-center max-w-xl mx-auto w-full">
-                <div className="bg-[#071109] p-5 rounded-xl border border-emerald-800/40 mb-6 relative group">
-                  <span className="block text-[10px] font-bold text-slate-400 mb-3 uppercase tracking-widest">Immutable Ledger Hash Record</span>
-                  <div className="flex items-center justify-between gap-4 font-mono text-xs sm:text-sm text-emerald-300 break-all p-3 bg-[#111c14] rounded-lg border border-emerald-800/30 select-all">
+                <div className="bg-[var(--bg-app)] p-4 rounded-xl border border-[var(--border-subtle)] mb-6">
+                  <span className="block text-[10px] font-bold text-[var(--text-muted)] mb-2 uppercase tracking-widest">Immutable Ledger Hash Record</span>
+                  <div className="flex items-center justify-between gap-4 font-mono text-xs text-[var(--color-primary)] font-semibold break-all p-3 bg-[var(--bg-surface)] rounded-lg border border-[var(--border-subtle)] select-all">
                     <code>{selectedIntervention ? `0x${selectedIntervention._id || 'pending'}` : '0x_awaiting_intervention_data'}</code>
-                    <button onClick={() => handleCopy(selectedIntervention?._id || '')} className="text-slate-400 hover:text-emerald-400 transition-colors shrink-0">
-                      <span className="material-symbols-outlined text-[18px]">{copied ? 'check' : 'content_copy'}</span>
+                    <button onClick={() => handleCopy(selectedIntervention?._id || '')} className="text-[var(--text-muted)] hover:text-[var(--color-primary)] transition-colors shrink-0">
+                      {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
                     </button>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-6 mb-8">
+                <div className="grid grid-cols-2 gap-6 mb-6">
                   <div>
-                    <span className="block text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-widest">Total Interventions</span>
-                    <span className="text-sm font-mono text-slate-200 flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_5px_emerald]"></span>
+                    <span className="block text-[10px] font-bold text-[var(--text-muted)] mb-1 uppercase tracking-widest">Total Interventions</span>
+                    <span className="text-xs font-mono text-[var(--text-primary)] flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-natural-green)] animate-pulse"></span>
                       {interventions.length} records
                     </span>
                   </div>
                   <div>
-                    <span className="block text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-widest">Citizen Reports</span>
-                    <span className="text-sm font-mono text-emerald-400">{citizenReports.length} submitted</span>
+                    <span className="block text-[10px] font-bold text-[var(--text-muted)] mb-1 uppercase tracking-widest">Citizen Reports</span>
+                    <span className="text-xs font-mono text-[var(--color-primary)]">{citizenReports.length} submitted</span>
                   </div>
                 </div>
-                <button onClick={handleVerify} disabled={verifying} className="w-full flex items-center justify-center gap-2 px-6 py-3.5 bg-emerald-950/40 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-600 hover:text-white transition-all text-sm font-bold rounded-xl uppercase tracking-widest relative overflow-hidden">
+                <button onClick={handleVerify} disabled={verifying} className="w-full flex items-center justify-center gap-2 px-6 py-3.5 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-white transition-all text-xs font-bold rounded-xl uppercase tracking-wider shadow-sm">
                   {verifying ? (
-                    <span className="flex items-center gap-2"><span className="w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin"></span> Verifying Hash...</span>
+                    <span className="flex items-center gap-2"><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span> Verifying Hash...</span>
                   ) : (
-                    <><span>Inspect on Blockchain Explorer</span><span className="material-symbols-outlined text-[18px]">open_in_new</span></>
+                    <><span>Inspect on Blockchain Explorer</span><ExternalLink className="w-4 h-4" /></>
                   )}
                 </button>
               </div>
@@ -182,63 +183,44 @@ export default function CivicProofLedger() {
           </div>
 
           {/* Right Column: Timeline from Interventions */}
-          <div className="lg:w-[420px] bg-[#111c14]/80 backdrop-blur-xl border border-emerald-900/40 rounded-2xl p-6 flex flex-col shadow-xl">
-            <h3 className="text-lg font-bold text-white mb-6 border-b border-emerald-900/30 pb-4 flex items-center gap-3">
-              <span className="material-symbols-outlined text-emerald-400">history</span>
+          <div className="lg:w-[380px] bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-2xl p-6 flex flex-col shadow-sm transition-colors text-[var(--text-primary)]">
+            <h3 className="text-base font-bold text-[var(--text-primary)] mb-4 border-b border-[var(--border-subtle)] pb-3 flex items-center gap-2">
+              <Activity className="w-4 h-4 text-[var(--color-primary)]" />
               {interventions.length > 0 ? 'Intervention Records' : 'Lifecycle Verification'}
             </h3>
             
-            <div className="relative flex-1 pl-6 pt-2 overflow-y-auto custom-scrollbar pr-2">
-              <div className="absolute left-[11px] top-6 bottom-4 w-px bg-gradient-to-b from-emerald-500 to-emerald-950"></div>
+            <div className="relative flex-1 pl-4 pt-2 overflow-y-auto custom-scrollbar pr-2">
+              <div className="absolute left-[7px] top-4 bottom-4 w-px bg-[var(--border-subtle)]"></div>
               
-              <div className="space-y-8 relative z-10 pb-4">
+              <div className="space-y-4 relative z-10 pb-4">
                 {interventions.length > 0 ? interventions.map((intv: any, idx: number) => {
-                  const isLast = idx === interventions.length - 1;
                   const isCompleted = intv.status === 'completed';
                   return (
-                    <div key={intv._id || idx} className="relative group cursor-pointer" onClick={() => setSelectedIntervention(intv)}>
-                      <div className={`absolute ${isLast ? '-left-[26px] w-[15px] h-[15px]' : '-left-6 w-3 h-3'} bg-emerald-400 rounded-full border-${isLast ? '[3px]' : '4'} border-[#0a140d] top-${isLast ? '0.5' : '1'} ${isLast ? 'shadow-[0_0_10px_rgba(16,185,129,0.8)]' : ''}`}></div>
-                      <div className="flex flex-col sm:flex-row sm:items-baseline justify-between mb-1.5 gap-1">
-                        <h4 className={`text-sm font-bold ${isCompleted ? 'text-emerald-400' : 'text-white'}`}>
-                          {intv.work_order_id || intv.description?.slice(0, 40) || 'Intervention'}
+                    <div key={intv._id || idx} className="relative cursor-pointer bg-[var(--bg-app)] p-3 rounded-xl border border-[var(--border-subtle)] hover:border-[var(--color-primary)]/40 transition-colors" onClick={() => setSelectedIntervention(intv)}>
+                      <div className={`absolute -left-4 w-2.5 h-2.5 rounded-full border-2 border-[var(--bg-surface)] top-3 ${isCompleted ? 'bg-[var(--color-natural-green)]' : 'bg-[var(--color-primary)]'}`}></div>
+                      <div className="flex flex-col sm:flex-row sm:items-baseline justify-between mb-1 gap-1">
+                        <h4 className={`text-xs font-bold ${isCompleted ? 'text-[var(--color-natural-green)]' : 'text-[var(--text-primary)]'}`}>
+                          {intv.work_order_id || intv.description?.slice(0, 35) || 'Intervention'}
                         </h4>
-                        <span className="font-mono text-[10px] text-slate-500 shrink-0">
+                        <span className="font-mono text-[10px] text-[var(--text-muted)] shrink-0">
                           {intv.created_at ? new Date(intv.created_at).toLocaleDateString() : ''}
                         </span>
                       </div>
-                      <p className="text-xs text-slate-400 mb-2.5">{intv.description}</p>
+                      <p className="text-xs text-[var(--text-secondary)] mb-2">{intv.description}</p>
                       <div className="flex items-center gap-2">
-                        <span className={`text-[9px] font-bold tracking-widest px-2 py-0.5 rounded ${
-                          isCompleted ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' :
-                          intv.status === 'in_progress' ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30' :
-                          'bg-slate-700/50 text-slate-400 border border-slate-600/30'
+                        <span className={`text-[9px] font-bold tracking-wider px-2 py-0.5 rounded ${
+                          isCompleted ? 'bg-[var(--color-soft-green)] text-[var(--color-natural-green)]' :
+                          intv.status === 'in_progress' ? 'bg-amber-100 text-amber-800' :
+                          'bg-[var(--bg-surface)] text-[var(--text-secondary)] border border-[var(--border-subtle)]'
                         }`}>
                           {(intv.status || '').toUpperCase().replace('_', ' ')}
                         </span>
-                        <span className="text-[9px] font-mono text-slate-400 capitalize">{intv.type}</span>
+                        <span className="text-[9px] font-mono text-[var(--text-muted)] capitalize">{intv.type}</span>
                       </div>
                     </div>
                   );
                 }) : (
-                  <>
-                    {/* Fallback with gov response timeline */}
-                    <div className="relative group">
-                      <div className="absolute -left-6 w-3 h-3 bg-emerald-400 rounded-full border-4 border-[#0a140d] top-1"></div>
-                      <h4 className="text-sm font-bold text-white mb-1.5">Government Response Active</h4>
-                      <p className="text-xs text-slate-400 mb-2.5">
-                        {govResponse ? `Total spending: ${totalSpending}. Pumping stations progress tracked.` : 'Post-flood response data loading...'}
-                      </p>
-                      <div className="inline-flex items-center gap-1.5 bg-[#16251b] px-2.5 py-1 rounded-md border border-emerald-800/40">
-                        <span className="material-symbols-outlined text-emerald-400 text-[14px]">verified</span>
-                        <span className="text-[9px] font-bold text-emerald-400 tracking-widest">CIVICPROOF</span>
-                      </div>
-                    </div>
-                    <div className="relative group">
-                      <div className="absolute -left-6 w-3 h-3 bg-slate-500 rounded-full border-4 border-[#0a140d] top-1"></div>
-                      <h4 className="text-sm font-bold text-slate-400 mb-1.5">No Interventions Yet</h4>
-                      <p className="text-xs text-slate-500">Create interventions via POST /api/interventions to populate the ledger.</p>
-                    </div>
-                  </>
+                  <div className="text-xs text-[var(--text-secondary)]">No interventions yet.</div>
                 )}
               </div>
             </div>
