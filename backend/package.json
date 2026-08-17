@@ -1,0 +1,36 @@
+{
+  "name": "jal-setu-backend",
+  "version": "1.0.0",
+  "description": "Jal Setu Nagpur — GIS-based urban flood intelligence backend",
+  "main": "dist/server.js",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "dev:seed": "tsx watch src/server.ts -- --seed",
+    "start": "node dist/server.js",
+    "build": "tsc",
+    "seed": "tsx src/server.ts --seed",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": ["gis", "flood", "nagpur", "jal-setu"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@turf/bbox-polygon": "^7.4.0",
+    "@turf/boolean-point-in-polygon": "^7.4.0",
+    "@turf/distance": "^7.4.0",
+    "@turf/turf": "^7.4.0",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "mongodb": "^7.5.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.2.0",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.23.12",
+    "typescript": "^7.0.2"
+  }
+}
