@@ -4,7 +4,7 @@
 
 ---
 
-## 🌊 Overview & Context
+## Overview & Context
 
 Nagpur faces recurrent, severe urban flooding during monsoon events due to rapid urbanization, inadequate drainage capacity, natural channel encroachments, and high clayey soil content. The catastrophic flood of **September 23, 2023** highlighted the urgent need for an integrated digital system to analyze hydrological vulnerabilities, guide municipal interventions, and empower citizen reporting.
 
